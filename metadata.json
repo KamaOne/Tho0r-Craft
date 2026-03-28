@@ -1,0 +1,7 @@
+{
+  "name": "Tho0r-Craft",
+  "description": "Prompt -craft est un générateur de prompt pour la création d'image. Pour tout type d'intelligence artificielle génératrice d'image. ",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
