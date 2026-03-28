@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard } from 'lucide-react';
+import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { config, angles, stylesData, stylesValue, lightsData, lightsValue, bgsData, bgsValue } from './data';
 import { LiveAssistant } from './components/LiveAssistant';
@@ -59,6 +59,7 @@ export default function App() {
   const [showLegal, setShowLegal] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [isNarratorActive, setIsNarratorActive] = useState(false);
   const [isMagnifierActive, setIsMagnifierActive] = useState(false);
 
@@ -262,13 +263,23 @@ export default function App() {
             model: 'gemini-2.5-flash-image',
             contents: {
               parts: [{ text: `${cleanPrompt}, ${angle}` }]
+            },
+            config: {
+              imageConfig: {
+                aspectRatio: aspect === '--ar 16:9' ? '16:9' : aspect === '--ar 9:16' ? '9:16' : aspect === '--ar 4:3' ? '4:3' : aspect === '--ar 3:4' ? '3:4' : '1:1'
+              }
             }
           });
         });
         
         const responses = await Promise.all(promises);
         const images = responses.map(res => {
-          const part = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+          const candidate = res.candidates?.[0];
+          const part = candidate?.content?.parts?.find(p => p.inlineData);
+          if (!part?.inlineData?.data) {
+             const textPart = candidate?.content?.parts?.find(p => p.text);
+             console.error("Rotation image failed:", textPart?.text || candidate?.finishReason || "Unknown error");
+          }
           return part?.inlineData?.data ? `data:image/png;base64,${part.inlineData.data}` : null;
         }).filter(Boolean) as string[];
 
@@ -277,7 +288,7 @@ export default function App() {
           setGeneratedImage(images[0]);
           setGallery(prev => [{ image: images[0], prompt: generatedPrompt, time: new Date().toLocaleTimeString() }, ...prev]);
         } else {
-          console.error("No image data returned for rotation");
+          throw new Error("No image data returned for rotation. This may be due to safety filters or an invalid prompt.");
         }
       } else {
         const response = await ai.models.generateContent({
@@ -286,20 +297,30 @@ export default function App() {
             parts: [
               { text: cleanPrompt }
             ]
+          },
+          config: {
+            imageConfig: {
+              aspectRatio: aspect === '--ar 16:9' ? '16:9' : aspect === '--ar 9:16' ? '9:16' : aspect === '--ar 4:3' ? '4:3' : aspect === '--ar 3:4' ? '3:4' : '1:1'
+            }
           }
         });
 
-        const imagePart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+        const candidate = response.candidates?.[0];
+        const imagePart = candidate?.content?.parts?.find(p => p.inlineData);
+        
         if (imagePart?.inlineData?.data) {
           const imgData = `data:image/png;base64,${imagePart.inlineData.data}`;
           setGeneratedImage(imgData);
           setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString() }, ...prev]);
         } else {
-          console.error("No image data returned");
+          const textPart = candidate?.content?.parts?.find(p => p.text);
+          const finishReason = candidate?.finishReason;
+          throw new Error(textPart?.text || (finishReason ? `Generation stopped due to: ${finishReason}` : "No image data returned. Check your prompt for safety violations."));
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating image:", error);
+      alert(`Error generating image: ${error.message}`);
     } finally {
       setIsGeneratingImage(false);
     }
@@ -821,11 +842,16 @@ export default function App() {
                     <Download className="w-4 h-4" /> DOWNLOAD
                   </button>
                 </div>
-                <img 
-                  src={rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage} 
-                  alt="Generated Vision" 
-                  className="w-full h-auto rounded-xl shadow-md transition-all duration-300" 
-                />
+                <div className="relative group cursor-pointer" onClick={() => setZoomedImage(rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage)}>
+                  <img 
+                    src={rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage} 
+                    alt="Generated Vision" 
+                    className="w-full h-auto rounded-xl shadow-md transition-all duration-300" 
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                    <ZoomIn className="w-12 h-12 text-white" />
+                  </div>
+                </div>
                 {rotationImages.length > 0 && (
                   <div className="mt-6 bg-theme-panel p-4 rounded-xl border border-theme-border">
                     <div className="flex justify-between text-[10px] font-bold uppercase text-theme-muted mb-2">
@@ -859,7 +885,12 @@ export default function App() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2">
                   {gallery.map((item, i) => (
                     <div key={i} className="bg-theme-panel rounded-xl overflow-hidden border border-theme-border group">
-                      <img src={item.image} alt="Generated" className="w-full h-auto object-cover aspect-square" />
+                      <div className="relative cursor-pointer" onClick={() => setZoomedImage(item.image)}>
+                        <img src={item.image} alt="Generated" className="w-full h-auto object-cover aspect-square" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <ZoomIn className="w-8 h-8 text-white" />
+                        </div>
+                      </div>
                       <div className="p-3">
                         <p className="text-[10px] text-theme-muted mb-2">{item.time}</p>
                         <p className="text-xs text-theme-text line-clamp-3 font-mono" title={item.prompt}>{item.prompt}</p>
@@ -1089,6 +1120,16 @@ export default function App() {
               <p><strong>Responsabilité :</strong> L'utilisateur est seul responsable des prompts générés et des images créées via l'application. KamaOne décline toute responsabilité quant à l'utilisation faite des contenus générés.</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* LIGHTBOX MODAL */}
+      {zoomedImage && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setZoomedImage(null)}>
+          <button className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors" onClick={() => setZoomedImage(null)}>
+            <X className="w-8 h-8" />
+          </button>
+          <img src={zoomedImage} alt="Zoomed" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={e => e.stopPropagation()} />
         </div>
       )}
 

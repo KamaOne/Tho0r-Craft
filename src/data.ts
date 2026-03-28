@@ -64,6 +64,16 @@ export const config: Record<string, any> = {
       { id: "car_color", label: "Finition", type: "select", options: ["Noir Mat", "Chrome", "Candy Red", "Néon Bleu", "British Green", "Caméléon", "Carbone Forgé", "Or 24k", "Rouille (Mad Max)"] },
       { id: "car_state", label: "État", type: "select", options: ["Neuf", "Boueux", "Accidenté", "Abandonné", "Custom"] }
     ] 
+  },
+  L: {
+    label: "✒️ Logo & Branding",
+    role: "Expert Graphic Designer & Brand Identity Specialist",
+    layouts: { L0: "Vector Logo", L1: "Mascot Logo", L2: "Emblem/Badge", L3: "Minimalist Lettermark" },
+    attrs: [
+      { id: "logo_style", label: "Style Graphique", type: "select", options: ["Flat Design", "3D Render", "Neon", "Vintage/Retro", "Origami", "Line Art", "Watercolor", "Esport/Gaming"] },
+      { id: "color_palette", label: "Palette de Couleurs", type: "select", options: ["Monochrome", "Pastel", "Neon/Cyberpunk", "Gold & Black", "Vibrant/Colorful", "Earthy Tones"] },
+      { id: "background_type", label: "Fond", type: "select", options: ["Fond Blanc Pur", "Fond Noir", "Dégradé", "Mockup sur Papier", "Mockup 3D Enseigne"] }
+    ]
   }
 };
 
