@@ -1,18 +1,27 @@
+import {
+  Globe, User, Activity, Palette, Eye, Scissors, PaintBucket, Shirt, Footprints,
+  Heart, Scan, Layers, Trees, Flame, Box, Building, Hammer, Sun, Car, Wrench, Map,
+  Mountain, CloudRain, Clock, Utensils, ChefHat, Lightbulb, Microscope, ZoomIn, Zap,
+  Brain, Hexagon, Hourglass, Sparkles, Clapperboard, Maximize, Sword, ShieldAlert,
+  Gem, Triangle, Image as ImageIcon, PenTool, Layout, Ghost, Paintbrush
+} from 'lucide-react';
+
 export const config: Record<string, any> = {
   A: { 
     label: "👤 Humain / Humanoïde",   
     role: "Expert Character Designer, Anatomy Expert", 
     layouts: { A0: "✦ Vue Unique", A1: "Turnaround Video IA", A2: "Model Sheet", A3: "Expression Sheet" },
     attrs: [
-      { id: "ethnicity", label: "Origine / Ethnie", type: "select", options: ["Caucasien", "Afro-descendant", "Est-Asiatique", "Sud-Asiatique", "Latino / Hispanique", "Moyen-Oriental", "Amérindien", "Polynésien / Océanien", "Inuit / Arctique", "Aborigène", "Nordique", "Celtique", "Slave", "Méditerranéen", "Métis / Mixte", "Mélanésien", "Caribéen", "Andin", "Balkanique", "Extraterrestre / Fantaisie", "Hybride Animal/Humain", "Être de Lumière"] },
-      { id: "age", label: "Âge", type: "select", options: ["Nouveau-né", "Nourrisson / Bébé", "Bambin", "Jeune Enfant", "Enfant", "Pré-adolescent", "Adolescent", "Jeune Adulte", "Adulte (30-40)", "Âge Moyen (40-60)", "Senior (60-70)", "Septuagénaire (70-80)", "Octogénaire (80-90)", "Nonagénaire (90-100)", "Centenaire", "Ancien / Vénérable", "Immortel / Intemporel", "Entité Cosmique"] },
-      { id: "body_type", label: "Morphologie", type: "select", options: ["Mince / Athlétique", "Musclé / Bodybuilder", "Rond / Curvy", "Généreux / Plus-size", "Svelte / Élancé", "Élancé / Longiligne", "Trapu / Massif", "Courtaud", "Androgyne", "Squelettique", "Gringalet", "Obèse", "Acrobate / Flexible", "Petite", "Grand(e)", "Difforme / Monstrueux", "Cyborg Augmenté", "Giant", "Tiny", "Amorphous", "Éthéré / Fantomatique", "Mécanique / Robotique"] },
-      { id: "skin", label: "Peau", type: "select", options: ["Porcelaine pâle", "Nordique clair", "Hâlé / Bronzé", "Olive doré", "Ébène profond", "Blanc albinos", "Chrome métallique"] },
-      { id: "eyes", label: "Yeux", type: "select", options: ["Bleu perçant", "Vert émeraude", "Brun profond", "Noisette", "Gris acier", "Optique cybernétique"] },
-      { id: "hair_style", label: "Coiffure", type: "select", options: ["Dreadlocks longs", "Locs bohème", "Crête iroquoise", "Pixie désordonné", "Longs et lisses", "Coupe militaire", "Chauve"] },
-      { id: "hair_color", label: "Couleur Cheveux", type: "select", options: ["Blond", "Blond vénitien", "Noir", "Brun", "Roux", "Auburn", "Néon Bleu", "Rose Pastel"] },
-      { id: "clothing", label: "Vêtements", type: "select", options: ["Toge", "Tenue antique", "Tenue médiévale", "Armure tactique", "Streetwear oversize", "Tunique cuir médiévale", "Costume victorien", "Techwear Cyberpunk", "Combinaison spatiale", "Costume cravate", "Robe de soirée", "Tenue de sport", "Uniforme", "Tenue décontractée", "Haute couture"] },
-      { id: "shoes", label: "Chaussures", type: "select", options: ["Baskets", "Tongs", "Dr. Martens", "Bottes en cuir", "Talons hauts", "Mocassins", "Chaussures de ville", "Bottes de combat", "Pieds nus"] }
+      { id: "ethnicity", label: "Origine / Ethnie", type: "select", icon: Globe, options: ["Caucasien", "Afro-descendant", "Est-Asiatique", "Sud-Asiatique", "Latino / Hispanique", "Moyen-Oriental", "Amérindien", "Polynésien / Océanien", "Inuit / Arctique", "Aborigène", "Nordique", "Celtique", "Slave", "Méditerranéen", "Métis / Mixte", "Mélanésien", "Caribéen", "Andin", "Balkanique", "Extraterrestre / Fantaisie", "Hybride Animal/Humain", "Être de Lumière"] },
+      { id: "age", label: "Âge", type: "select", icon: User, options: ["Nouveau-né", "Nourrisson / Bébé", "Bambin", "Jeune Enfant", "Enfant", "Pré-adolescent", "Adolescent", "Jeune Adulte", "Adulte (30-40)", "Âge Moyen (40-60)", "Senior (60-70)", "Septuagénaire (70-80)", "Octogénaire (80-90)", "Nonagénaire (90-100)", "Centenaire", "Ancien / Vénérable", "Immortel / Intemporel", "Entité Cosmique"] },
+      { id: "body_type", label: "Morphologie", type: "select", icon: Activity, options: ["Mince / Athlétique", "Musclé / Bodybuilder", "Rond / Curvy", "Généreux / Plus-size", "Svelte / Élancé", "Élancé / Longiligne", "Trapu / Massif", "Courtaud", "Androgyne", "Squelettique", "Gringalet", "Obèse", "Acrobate / Flexible", "Petite", "Grand(e)", "Difforme / Monstrueux", "Cyborg Augmenté", "Giant", "Tiny", "Amorphous", "Éthéré / Fantomatique", "Mécanique / Robotique"] },
+      { id: "skin", label: "Peau", type: "select", icon: Palette, options: ["Porcelaine pâle", "Nordique clair", "Hâlé / Bronzé", "Olive doré", "Ébène profond", "Blanc albinos", "Chrome métallique"] },
+      { id: "eyes", label: "Yeux", type: "select", icon: Eye, options: ["Bleu perçant", "Vert émeraude", "Brun profond", "Noisette", "Gris acier", "Optique cybernétique"] },
+      { id: "hair_style", label: "Coiffure", type: "select", icon: Scissors, options: ["Dreadlocks longs", "Locs bohème", "Crête iroquoise", "Pixie désordonné", "Longs et lisses", "Coupe militaire", "Chauve"] },
+      { id: "hair_color", label: "Couleur Cheveux", type: "select", icon: PaintBucket, options: ["Blond", "Blond vénitien", "Noir", "Brun", "Roux", "Auburn", "Néon Bleu", "Rose Pastel"] },
+      { id: "clothing", label: "Vêtements", type: "select", icon: Shirt, options: ["Toge", "Tenue antique", "Tenue médiévale", "Armure tactique", "Streetwear oversize", "Tunique cuir médiévale", "Costume victorien", "Techwear Cyberpunk", "Combinaison spatiale", "Costume cravate", "Robe de soirée", "Tenue de sport", "Uniforme", "Tenue décontractée", "Haute couture"] },
+      { id: "shoes", label: "Chaussures", type: "select", icon: Footprints, options: ["Baskets", "Tongs", "Dr. Martens", "Bottes en cuir", "Talons hauts", "Mocassins", "Chaussures de ville", "Bottes de combat", "Pieds nus"] },
+      { id: "skin_material", label: "Skin Material", type: "select", icon: Paintbrush, options: ["Pristine", "Weathered", "Cybernetic", "Ethereal", "Scratched", "Scaled", "Metallic sheen", "Glows faintly"] }
     ]
   },
   G: { 
@@ -20,9 +29,9 @@ export const config: Record<string, any> = {
     role: "Scientific Medical Illustrator", 
     layouts: { G0: "✦ Vue Unique", G1: "Anatomical Cross-section", G2: "Exploded View", G3: "Skeletal Turnaround" },
     attrs: [
-      { id: "system", label: "Système", type: "select", options: ["Musculaire", "Squelettique", "Nerveux", "Circulatoire", "Digestif", "Lymphatique"] },
-      { id: "organs", label: "Organe Focus", type: "select", options: ["Cœur Humain", "Cerveau", "Poumons", "Foie", "Reins", "Yeux", "Estomac"] },
-      { id: "view_type", label: "Rendu", type: "select", options: ["Rayons X", "IRM", "Écorché (Muscles)", "Transparence", "Microscopique"] }
+      { id: "system", label: "Système", type: "select", icon: Activity, options: ["Musculaire", "Squelettique", "Nerveux", "Circulatoire", "Digestif", "Lymphatique"] },
+      { id: "organs", label: "Organe Focus", type: "select", icon: Heart, options: ["Cœur Humain", "Cerveau", "Poumons", "Foie", "Reins", "Yeux", "Estomac"] },
+      { id: "view_type", label: "Rendu", type: "select", icon: Scan, options: ["Rayons X", "IRM", "Écorché (Muscles)", "Transparence", "Microscopique"] }
     ]
   },
   B: { 
@@ -30,24 +39,24 @@ export const config: Record<string, any> = {
     role: "Wildlife Concept Artist", 
     layouts: { B0: "✦ Single View", B1: "Creature Rotation", B2: "Motion Reference" },
     attrs: [
-      { id: "texture", label: "Texture", type: "select", options: ["Fur", "Scales", "Feathers", "Leathery Skin", "Bone Plates", "Chitin", "Bioluminescent", "Crystal"] },
-      { id: "habitat", label: "Habitat", type: "select", options: ["Forest", "Arctic", "Desert", "Jungle", "Ocean", "Volcanic", "Urban", "Alien Planet"] },
-      { id: "temperament", label: "Temperament", type: "select", options: ["Aggressive", "Docile", "Playful", "Territorial", "Curious", "Skittish", "Majestic", "Predatory"] }
+      { id: "texture", label: "Texture", type: "select", icon: Layers, options: ["Fur", "Scales", "Feathers", "Leathery Skin", "Bone Plates", "Chitin", "Bioluminescent", "Crystal"] },
+      { id: "habitat", label: "Habitat", type: "select", icon: Trees, options: ["Forest", "Arctic", "Desert", "Jungle", "Ocean", "Volcanic", "Urban", "Alien Planet"] },
+      { id: "temperament", label: "Temperament", type: "select", icon: Flame, options: ["Aggressive", "Docile", "Playful", "Territorial", "Curious", "Skittish", "Majestic", "Predatory"] }
     ]
   },
   C: { 
     label: "📦 Objet / Prop", 
     role: "Senior Prop Artist", 
     layouts: { C0: "Vue Unique", C1: "Orthographic" }, 
-    attrs: [{ id: "material", label: "Matériau", type: "select", options: ["Fer rouillé", "Chrome poli", "Bois patiné", "Carbone", "Or", "Pierre"] }] 
+    attrs: [{ id: "material", label: "Matériau", type: "select", icon: Box, options: ["Fer rouillé", "Chrome poli", "Bois patiné", "Carbone", "Or", "Pierre"] }] 
   },
   D: { 
     label: "🏛️ Architecture", 
     role: "Architectural Visualizer", 
     layouts: { D0: "Vue Unique", D1: "Elevation Plan" }, 
     attrs: [
-      { id: "arch_mat", label: "Matériaux", type: "select", options: ["Béton brut", "Brique rouge", "Verre/Acier", "Bois", "Marbre"] }, 
-      { id: "arch_style", label: "Style", type: "select", options: ["Minimaliste", "Gothique", "Victorien", "Industriel", "Cyberpunk", "Zen"] }
+      { id: "arch_mat", label: "Matériaux", type: "select", icon: Hammer, options: ["Béton brut", "Brique rouge", "Verre/Acier", "Bois", "Marbre"] }, 
+      { id: "arch_style", label: "Style", type: "select", icon: Building, options: ["Minimaliste", "Gothique", "Victorien", "Industriel", "Cyberpunk", "Zen"] }
     ] 
   },
   E: { 
@@ -55,8 +64,8 @@ export const config: Record<string, any> = {
     role: "Environment Artist", 
     layouts: { E0: "Vue Unique", E1: "Panoramic" }, 
     attrs: [
-      { id: "flora", label: "Flore", type: "select", options: ["Pins", "Chênes", "Palmiers", "Arbres morts", "Sakura"] }, 
-      { id: "terrain", label: "Sol", type: "select", options: ["Herbe", "Sable", "Neige", "Roche volcanique", "Boue"] }
+      { id: "flora", label: "Flore", type: "select", icon: Trees, options: ["Pins", "Chênes", "Palmiers", "Arbres morts", "Sakura"] }, 
+      { id: "terrain", label: "Sol", type: "select", icon: Mountain, options: ["Herbe", "Sable", "Neige", "Roche volcanique", "Boue"] }
     ] 
   },
   F: { 
@@ -64,8 +73,8 @@ export const config: Record<string, any> = {
     role: "Vehicle Designer", 
     layouts: { F0: "✦ Vue Unique", F1: "Blueprint Tech" },
     attrs: [
-      { id: "car_color", label: "Finition", type: "select", options: ["Noir Mat", "Chrome", "Candy Red", "Néon Bleu", "British Green", "Caméléon", "Carbone Forgé", "Or 24k", "Rouille (Mad Max)"] },
-      { id: "car_state", label: "État", type: "select", options: ["Neuf", "Boueux", "Accidenté", "Abandonné", "Custom"] }
+      { id: "car_color", label: "Finition", type: "select", icon: PaintBucket, options: ["Noir Mat", "Chrome", "Candy Red", "Néon Bleu", "British Green", "Caméléon", "Carbone Forgé", "Or 24k", "Rouille (Mad Max)"] },
+      { id: "car_state", label: "État", type: "select", icon: Wrench, options: ["Neuf", "Boueux", "Accidenté", "Abandonné", "Custom"] }
     ] 
   },
   L: {
@@ -73,9 +82,9 @@ export const config: Record<string, any> = {
     role: "Expert Graphic Designer & Brand Identity Specialist",
     layouts: { L0: "Vector Logo", L1: "Mascot Logo", L2: "Emblem/Badge", L3: "Minimalist Lettermark" },
     attrs: [
-      { id: "logo_style", label: "Style Graphique", type: "select", options: ["Flat Design", "3D Render", "Neon", "Vintage/Retro", "Origami", "Line Art", "Watercolor", "Esport/Gaming"] },
-      { id: "color_palette", label: "Palette de Couleurs", type: "select", options: ["Monochrome", "Pastel", "Neon/Cyberpunk", "Gold & Black", "Vibrant/Colorful", "Earthy Tones"] },
-      { id: "background_type", label: "Fond", type: "select", options: ["Fond Blanc Pur", "Fond Noir", "Dégradé", "Mockup sur Papier", "Mockup 3D Enseigne"] }
+      { id: "logo_style", label: "Style Graphique", type: "select", icon: PenTool, options: ["Flat Design", "3D Render", "Neon", "Vintage/Retro", "Origami", "Line Art", "Watercolor", "Esport/Gaming"] },
+      { id: "color_palette", label: "Palette de Couleurs", type: "select", icon: Palette, options: ["Monochrome", "Pastel", "Neon/Cyberpunk", "Gold & Black", "Vibrant/Colorful", "Earthy Tones"] },
+      { id: "background_type", label: "Fond", type: "select", icon: Layout, options: ["Fond Blanc Pur", "Fond Noir", "Dégradé", "Mockup sur Papier", "Mockup 3D Enseigne"] }
     ]
   },
   H: {
@@ -83,9 +92,9 @@ export const config: Record<string, any> = {
     role: "Master Fantasy Concept Artist and Creature Designer",
     layouts: { H0: "Full Body Concept", H1: "Action Pose", H2: "Habitat Scene", H3: "Anatomical Study" },
     attrs: [
-      { id: "creature_type", label: "Type", type: "select", options: ["Dragon", "Griffin", "Chimera", "Sea Monster", "Beast", "Elemental"] },
-      { id: "creature_element", label: "Element", type: "select", options: ["Fire", "Ice", "Shadow", "Light", "Earth", "Lightning", "Arcane"] },
-      { id: "creature_scale", label: "Scale", type: "select", options: ["Colossal", "Giant", "Human-sized", "Small", "Microscopic"] }
+      { id: "creature_type", label: "Type", type: "select", icon: Ghost, options: ["Dragon", "Griffin", "Chimera", "Sea Monster", "Beast", "Elemental"] },
+      { id: "creature_element", label: "Element", type: "select", icon: Flame, options: ["Fire", "Ice", "Shadow", "Light", "Earth", "Lightning", "Arcane"] },
+      { id: "creature_scale", label: "Scale", type: "select", icon: Maximize, options: ["Colossal", "Giant", "Human-sized", "Small", "Microscopic"] }
     ]
   },
   I: {
@@ -93,9 +102,9 @@ export const config: Record<string, any> = {
     role: "Expert Mythological Illustrator and Lore Master",
     layouts: { I0: "Heroic Portrait", I1: "Divine Manifestation", I2: "Epic Battle Scene", I3: "Statue/Idol" },
     attrs: [
-      { id: "myth_origin", label: "Pantheon", type: "select", options: ["Greek", "Norse", "Egyptian", "Celtic", "Japanese", "Aztec", "Mesopotamian"] },
-      { id: "myth_nature", label: "Nature", type: "select", options: ["Deity", "Demigod", "Spirit", "Demon", "Titan", "Nymph"] },
-      { id: "myth_aura", label: "Aura", type: "select", options: ["Radiant", "Menacing", "Ethereal", "Chaotic", "Serene", "Corrupted"] }
+      { id: "myth_origin", label: "Pantheon", type: "select", icon: Globe, options: ["Greek", "Norse", "Egyptian", "Celtic", "Japanese", "Aztec", "Mesopotamian"] },
+      { id: "myth_nature", label: "Nature", type: "select", icon: Sparkles, options: ["Deity", "Demigod", "Spirit", "Demon", "Titan", "Nymph"] },
+      { id: "myth_aura", label: "Aura", type: "select", icon: Sun, options: ["Radiant", "Menacing", "Ethereal", "Chaotic", "Serene", "Corrupted"] }
     ]
   },
   J: {
@@ -103,9 +112,9 @@ export const config: Record<string, any> = {
     role: "Visionary Abstract Artist and Visual Metaphor Expert",
     layouts: { J0: "Surreal Composition", J1: "Geometric Abstraction", J2: "Fluid Dynamics", J3: "Minimalist Symbolism" },
     attrs: [
-      { id: "abstract_theme", label: "Theme", type: "select", options: ["Time", "Love", "Chaos", "Order", "Dreams", "Consciousness", "Infinity", "Decay"] },
-      { id: "abstract_color", label: "Color Palette", type: "select", options: ["Monochrome", "Neon Contrast", "Muted Pastels", "Primary Colors", "Iridescent", "Void/Black"] },
-      { id: "abstract_shape", label: "Dominant Shape", type: "select", options: ["Spheres", "Fractals", "Sharp Angles", "Flowing Waves", "Spirals", "Shattered Glass"] }
+      { id: "abstract_theme", label: "Theme", type: "select", icon: Brain, options: ["Time", "Love", "Chaos", "Order", "Dreams", "Consciousness", "Infinity", "Decay"] },
+      { id: "abstract_color", label: "Color Palette", type: "select", icon: Palette, options: ["Monochrome", "Neon Contrast", "Muted Pastels", "Primary Colors", "Iridescent", "Void/Black"] },
+      { id: "abstract_shape", label: "Dominant Shape", type: "select", icon: Hexagon, options: ["Spheres", "Fractals", "Sharp Angles", "Flowing Waves", "Spirals", "Shattered Glass"] }
     ]
   },
   K: {
@@ -113,9 +122,9 @@ export const config: Record<string, any> = {
     role: "Expert Costume Designer and Fashion Historian",
     layouts: { K0: "Full Body Mannequin", K1: "Fabric Detail Shot", K2: "Historical Context Scene", K3: "Layered Breakdown" },
     attrs: [
-      { id: "costume_era", label: "Historical Era", type: "select", options: ["Victorian", "Renaissance", "Cyberpunk", "1920s Flapper", "Sci-Fi Future", "Medieval", "Ancient Egyptian"] },
-      { id: "costume_material", label: "Primary Material", type: "select", options: ["Silk & Lace", "Heavy Leather", "Velvet & Gold", "Holographic Synthetic", "Woven Linen", "Chainmail"] },
-      { id: "costume_vibe", label: "Aesthetic/Vibe", type: "select", options: ["Royal / Regal", "Peasant / Commoner", "Tactical / Combat", "Ceremonial", "Nomadic / Wasteland"] }
+      { id: "costume_era", label: "Historical Era", type: "select", icon: Hourglass, options: ["Victorian", "Renaissance", "Cyberpunk", "1920s Flapper", "Sci-Fi Future", "Medieval", "Ancient Egyptian"] },
+      { id: "costume_material", label: "Primary Material", type: "select", icon: Scissors, options: ["Silk & Lace", "Heavy Leather", "Velvet & Gold", "Holographic Synthetic", "Woven Linen", "Chainmail"] },
+      { id: "costume_vibe", label: "Aesthetic/Vibe", type: "select", icon: Sparkles, options: ["Royal / Regal", "Peasant / Commoner", "Tactical / Combat", "Ceremonial", "Nomadic / Wasteland"] }
     ]
   },
   M: {
@@ -123,9 +132,9 @@ export const config: Record<string, any> = {
     role: "Master Production Designer and Theatrical Set Artist",
     layouts: { M0: "Wide Establishing Shot", M1: "Stage Front View", M2: "Top-Down Floor Plan", M3: "Dramatic Lighting Focus" },
     attrs: [
-      { id: "set_theme", label: "Theme", type: "select", options: ["Sci-Fi Bridge", "Victorian Parlor", "Post-Apocalyptic Ruin", "Fantasy Tavern", "Modern Minimalist", "Haunted Mansion"] },
-      { id: "set_lighting", label: "Stage Lighting", type: "select", options: ["Spotlight Focus", "Dim & Moody", "Neon Glow", "Natural Daylight", "Cinematic High Contrast", "Eerie Bioluminescence"] },
-      { id: "set_scale", label: "Scale", type: "select", options: ["Intimate Room", "Massive Arena", "Outdoor Landscape", "Claustrophobic Corridor", "Grand Hall"] }
+      { id: "set_theme", label: "Theme", type: "select", icon: Clapperboard, options: ["Sci-Fi Bridge", "Victorian Parlor", "Post-Apocalyptic Ruin", "Fantasy Tavern", "Modern Minimalist", "Haunted Mansion"] },
+      { id: "set_lighting", label: "Stage Lighting", type: "select", icon: Lightbulb, options: ["Spotlight Focus", "Dim & Moody", "Neon Glow", "Natural Daylight", "Cinematic High Contrast", "Eerie Bioluminescence"] },
+      { id: "set_scale", label: "Scale", type: "select", icon: Maximize, options: ["Intimate Room", "Massive Arena", "Outdoor Landscape", "Claustrophobic Corridor", "Grand Hall"] }
     ]
   },
   N: {
@@ -133,9 +142,9 @@ export const config: Record<string, any> = {
     role: "Lead Prop Concept Artist and 3D Modeler",
     layouts: { N0: "Studio Hero Shot", N1: "Orthographic Views", N2: "In-Hand Scale Reference", N3: "Weathered Detail Close-up" },
     attrs: [
-      { id: "prop_type", label: "Prop Type", type: "select", options: ["Melee Weapon", "Magical Artifact", "Sci-Fi Gadget", "Everyday Item", "Vehicle Part", "Ancient Relic"] },
-      { id: "prop_condition", label: "Condition", type: "select", options: ["Pristine / Mint", "Battle-Damaged", "Ancient / Rusted", "Cybernetically Enhanced", "Overgrown with Nature"] },
-      { id: "prop_material", label: "Material", type: "select", options: ["Scrap Metal", "Obsidian", "Glowing Crystal", "Carved Bone", "Damascus Steel", "Matte Plastic", "Polished Wood", "Rusted Iron", "Ethereal Energy"] }
+      { id: "prop_type", label: "Prop Type", type: "select", icon: Sword, options: ["Melee Weapon", "Magical Artifact", "Sci-Fi Gadget", "Everyday Item", "Vehicle Part", "Ancient Relic"] },
+      { id: "prop_condition", label: "Condition", type: "select", icon: ShieldAlert, options: ["Pristine / Mint", "Battle-Damaged", "Ancient / Rusted", "Cybernetically Enhanced", "Overgrown with Nature"] },
+      { id: "prop_material", label: "Material", type: "select", icon: Gem, options: ["Scrap Metal", "Obsidian", "Glowing Crystal", "Carved Bone", "Damascus Steel", "Matte Plastic", "Polished Wood", "Rusted Iron", "Ethereal Energy", "Glossy"] }
     ]
   },
   O: {
@@ -143,9 +152,9 @@ export const config: Record<string, any> = {
     role: "Expert 3D Modeler and Asset Creator",
     layouts: { O0: "Single Model View", O1: "Orthographic Views", O2: "Wireframe View", O3: "Turntable Render" },
     attrs: [
-      { id: "model_material", label: "Material", type: "select", options: ["Matte Plastic", "Brushed Metal", "Glossy Ceramic", "Rough Stone", "Clear Glass", "Holographic"] },
-      { id: "model_polycount", label: "Poly Count", type: "select", options: ["Low Poly", "Mid Poly", "High Poly", "Sculpted Detail", "Voxel"] },
-      { id: "model_texture", label: "Texture Resolution", type: "select", options: ["Pixel Art (Pixelated)", "Stylized (Hand-painted)", "PBR Realistic (4K)", "Untextured (Clay Render)"] }
+      { id: "model_material", label: "Material", type: "select", icon: Box, options: ["Matte Plastic", "Brushed Metal", "Glossy Ceramic", "Rough Stone", "Clear Glass", "Holographic"] },
+      { id: "model_polycount", label: "Poly Count", type: "select", icon: Triangle, options: ["Low Poly", "Mid Poly", "High Poly", "Sculpted Detail", "Voxel"] },
+      { id: "model_texture", label: "Texture Resolution", type: "select", icon: ImageIcon, options: ["Pixel Art (Pixelated)", "Stylized (Hand-painted)", "PBR Realistic (4K)", "Untextured (Clay Render)"] }
     ]
   },
   P: {
@@ -153,9 +162,9 @@ export const config: Record<string, any> = {
     role: "Lead Brand Designer and Corporate Identity Specialist",
     layouts: { P0: "Centered Logo on Solid Background", P1: "Logo with Typography/Wordmark", P2: "App Icon Design", P3: "Brand Identity Mockup (Business Cards, Letterhead)" },
     attrs: [
-      { id: "logo_style", label: "Style", type: "select", options: ["Minimalist", "Vintage / Retro", "Mascot / Character", "Abstract / Geometric", "Hand-drawn / Organic", "Corporate / Professional", "3D / Embossed", "Cyberpunk / Neon"] },
-      { id: "logo_color", label: "Color Palette", type: "select", options: ["Monochrome", "Black and White", "Pastel", "Neon / Vibrant", "Earthy / Natural", "Gradient", "Gold / Luxury", "Primary Colors"] },
-      { id: "logo_background", label: "Background", type: "select", options: ["Transparent / White", "Dark / Black", "Textured Paper", "Gradient Backdrop", "Contextual Mockup"] }
+      { id: "logo_style", label: "Style", type: "select", icon: PenTool, options: ["Minimalist", "Vintage / Retro", "Mascot / Character", "Abstract / Geometric", "Hand-drawn / Organic", "Corporate / Professional", "3D / Embossed", "Cyberpunk / Neon"] },
+      { id: "logo_color", label: "Color Palette", type: "select", icon: Palette, options: ["Monochrome", "Black and White", "Pastel", "Neon / Vibrant", "Earthy / Natural", "Gradient", "Gold / Luxury", "Primary Colors"] },
+      { id: "logo_background", label: "Background", type: "select", icon: Layout, options: ["Transparent / White", "Dark / Black", "Textured Paper", "Gradient Backdrop", "Contextual Mockup"] }
     ]
   }
 };
@@ -237,7 +246,7 @@ export const bgsData: Record<string, string> = {
   F14: "Désert", F15: "Océan", F16: "Montagnes", F17: "Ville Cyberpunk", F18: "Village Médiéval", 
   F19: "Station Spatiale", F20: "Sous-marin", F21: "Ville en Ruines",
   F22: "Dégradé Abstrait", F23: "Motifs Géométriques", F24: "Lumières Bokeh", F25: "Grille Néon", 
-  F26: "Tourbillons Liquides", F27: "Formes Minimalistes"
+  F26: "Tourbillons Liquides", F27: "Formes Minimalistes", F28: "Abstract Geometric Patterns", F29: "Abstract"
 };
 export const bgsValue: Record<string, string> = { 
   F1: "pure white background", F2: "green screen", F3: "grey background", F4: "black background", 
@@ -246,5 +255,5 @@ export const bgsValue: Record<string, string> = {
   F14: "desert landscape with dunes", F15: "vast ocean view", F16: "snowy mountain peaks", F17: "neon-lit cyberpunk city street", F18: "medieval fantasy village", 
   F19: "futuristic space station interior", F20: "underwater coral reef", F21: "post-apocalyptic ruined city",
   F22: "smooth abstract color gradient background", F23: "abstract geometric patterns background", F24: "soft bokeh lights background", F25: "retro 80s neon grid background", 
-  F26: "abstract liquid swirls background", F27: "minimalist abstract shapes background"
+  F26: "abstract liquid swirls background", F27: "minimalist abstract shapes background", F28: "abstract geometric patterns background", F29: "abstract background"
 };

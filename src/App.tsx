@@ -767,7 +767,10 @@ export default function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {config[category].attrs.map((attr: any) => (
                         <div key={attr.id}>
-                          <label className="block text-[9px] text-theme-muted mb-1 font-black uppercase tracking-widest">{attr.label}</label>
+                          <label className="flex items-center gap-1.5 text-[9px] text-theme-muted mb-1 font-black uppercase tracking-widest">
+                            {attr.icon && <attr.icon className="w-3 h-3" />}
+                            {attr.label}
+                          </label>
                           <select 
                             value={attributes[attr.id] || ''} 
                             onChange={(e) => setAttributes({...attributes, [attr.id]: e.target.value})}
@@ -1178,13 +1181,13 @@ export default function App() {
                     <Download className="w-4 h-4" /> DOWNLOAD
                   </button>
                 </div>
-                <div className="relative group cursor-pointer" onClick={() => setZoomedImage(rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage)}>
+                <div className="relative group cursor-pointer overflow-hidden rounded-xl transition-all duration-500 hover:shadow-[0_0_30px_var(--accent)]" onClick={() => setZoomedImage(rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage)}>
                   <img 
                     src={rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage} 
                     alt="Generated Vision" 
-                    className="w-full h-auto rounded-xl shadow-md transition-all duration-300" 
+                    className="w-full h-auto rounded-xl shadow-md transition-transform duration-500 group-hover:scale-105" 
                   />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl flex items-center justify-center">
                     <ZoomIn className="w-12 h-12 text-white" />
                   </div>
                 </div>
@@ -1244,10 +1247,10 @@ export default function App() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2">
                   {filteredAndSortedGallery.map((item) => (
-                    <div key={item.image} className="bg-theme-panel rounded-xl overflow-hidden border border-theme-border group">
-                      <div className="relative cursor-pointer" onClick={() => setZoomedImage(item.image)}>
-                        <img src={item.image} alt="Generated" className="w-full h-auto object-cover aspect-square" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div key={item.image} className="bg-theme-panel rounded-xl overflow-hidden border border-theme-border group transition-all duration-500 hover:shadow-[0_0_20px_var(--accent)] hover:border-theme-accent">
+                      <div className="relative cursor-pointer overflow-hidden" onClick={() => setZoomedImage(item.image)}>
+                        <img src={item.image} alt="Generated" className="w-full h-auto object-cover aspect-square transition-transform duration-500 group-hover:scale-110" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center">
                           <ZoomIn className="w-8 h-8 text-white" />
                         </div>
                       </div>
@@ -1373,15 +1376,26 @@ export default function App() {
                 <p className="text-theme-muted">
                   Tho0r-Craft ne génère pas de simples mots-clés au hasard. Il suit un pipeline de production professionnel inspiré du cinéma : 
                   <br/><br/>
-                  <strong className="text-theme-text bg-theme-accent/10 px-2 py-1 rounded">Sujet &gt; Angle &gt; ADN (Détails) &gt; Ambiance</strong>
+                  <strong className="text-theme-text bg-theme-accent/10 px-2 py-1 rounded">Sujet (via le menu déroulant ou texte) &gt; Angle &gt; ADN (Détails) &gt; Ambiance</strong>
                   <br/><br/>
-                  Respectez cet ordre de réflexion pour obtenir des résultats précis et professionnels de la part de l'IA.
+                  Respectez cet ordre de réflexion pour obtenir des résultats précis et professionnels de la part de l'IA. De nouvelles catégories comme <strong className="text-theme-text">Logo & Branding</strong> et des attributs détaillés pour les <strong className="text-theme-text">Animaux/Créatures</strong> sont disponibles pour affiner votre vision.
                 </p>
               </div>
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>2.</span> Les Sliders de Post-Production
+                  <span>2.</span> Prompts Négatifs & Poids
+                </h3>
+                <p className="text-theme-muted">
+                  Vous pouvez exclure des éléments de votre image via le champ <strong className="text-theme-text">Negative Prompt</strong>. 
+                  <br/><br/>
+                  Nouveauté : Vous pouvez désormais ajuster le <strong className="text-theme-text">poids (l'importance)</strong> de chaque mot-clé négatif à l'aide des sliders (ex: <code className="bg-theme-bg px-1 rounded text-theme-accent">blurry::2</code>). Plus le poids est élevé, plus l'IA évitera cet élément.
+                </p>
+              </div>
+
+              <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
+                <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <span>3.</span> Les Sliders de Post-Production
                 </h3>
                 <ul className="space-y-3 text-theme-muted">
                   <li className="flex items-start gap-2">
@@ -1401,7 +1415,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>3.</span> Freyad-Craft & Génération d'Images
+                  <span>4.</span> Freyad-Craft & Génération d'Images
                 </h3>
                 <p className="text-theme-muted">
                   <strong className="text-theme-text">Freyad-Craft</strong> est votre assistant IA (masculin) bilingue, accessible via l'icône en bas à droite. Il connaît parfaitement l'application et peut vous guider.
@@ -1412,7 +1426,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>4.</span> Sauvegarde & Historique
+                  <span>5.</span> Sauvegarde & Historique
                 </h3>
                 <p className="text-theme-muted">
                   Utilisez les <strong className="text-theme-text">Presets</strong> pour enregistrer vos configurations favorites (ex: "Mon Style Pixar"). 
@@ -1421,7 +1435,7 @@ export default function App() {
               </div>
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>5.</span> L'Assistante Vocale (Microphone)
+                  <span>6.</span> L'Assistante Vocale (Microphone)
                 </h3>
                 <p className="text-theme-muted">
                   En cliquant sur l'icône <strong className="text-theme-text">Microphone</strong> (en haut à droite), vous pouvez discuter directement avec <strong className="text-theme-text">Hildegarde</strong>, votre assistante vocale. Elle a une voix douce et amicale, et elle est là pour vous aider à trouver des idées, étoffer vos descriptions, ou vous suggérer des styles et des ambiances pour vos créations.
@@ -1430,7 +1444,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>6.</span> Accessibilité
+                  <span>7.</span> Accessibilité
                 </h3>
                 <p className="text-theme-muted">
                   Dans les <strong className="text-theme-text">PARAMÈTRES</strong> (en haut à droite), vous pouvez activer <strong className="text-theme-text">Hildegarde en mode Narratrice</strong> pour les personnes non-voyantes (qui lit l'interface au survol) ainsi qu'une <strong className="text-theme-text">Loupe (Zoom UI)</strong> pour les personnes malvoyantes.
