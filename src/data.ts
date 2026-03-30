@@ -26,13 +26,13 @@ export const config: Record<string, any> = {
     ]
   },
   B: { 
-    label: "🐾 Animal / Créature",   
+    label: "🐾 Animal / Creature",   
     role: "Wildlife Concept Artist", 
-    layouts: { B0: "✦ Vue Unique", B1: "Creature Rotation", B2: "Motion Reference" },
+    layouts: { B0: "✦ Single View", B1: "Creature Rotation", B2: "Motion Reference" },
     attrs: [
-      { id: "surface", label: "Texture", type: "select", options: ["Fourrure épaisse", "Écailles lisses", "Peau tannée", "Plaques osseuses", "Plumage coloré", "Chitine", "Bioluminescence", "Cristal"] },
-      { id: "pattern", label: "Motif", type: "select", options: ["Rayures tigre", "Taches léopard", "Uni", "Camouflage", "Zébrures", "Albinos", "Mélanique", "Magma"] },
-      { id: "scars", label: "Vécu", type: "select", options: ["Intact", "Cicatrice œil", "Oreille déchirée", "Griffures", "Brûlures", "Implant cyber"] }
+      { id: "texture", label: "Texture", type: "select", options: ["Fur", "Scales", "Feathers", "Leathery Skin", "Bone Plates", "Chitin", "Bioluminescent", "Crystal"] },
+      { id: "habitat", label: "Habitat", type: "select", options: ["Forest", "Arctic", "Desert", "Jungle", "Ocean", "Volcanic", "Urban", "Alien Planet"] },
+      { id: "temperament", label: "Temperament", type: "select", options: ["Aggressive", "Docile", "Playful", "Territorial", "Curious", "Skittish", "Majestic", "Predatory"] }
     ]
   },
   C: { 
@@ -133,7 +133,7 @@ export const config: Record<string, any> = {
     role: "Lead Prop Concept Artist and 3D Modeler",
     layouts: { N0: "Studio Hero Shot", N1: "Orthographic Views", N2: "In-Hand Scale Reference", N3: "Weathered Detail Close-up" },
     attrs: [
-      { id: "prop_type", label: "Type", type: "select", options: ["Melee Weapon", "Magical Artifact", "Sci-Fi Gadget", "Everyday Item", "Vehicle Part", "Ancient Relic"] },
+      { id: "prop_type", label: "Prop Type", type: "select", options: ["Melee Weapon", "Magical Artifact", "Sci-Fi Gadget", "Everyday Item", "Vehicle Part", "Ancient Relic"] },
       { id: "prop_condition", label: "Condition", type: "select", options: ["Pristine / Mint", "Battle-Damaged", "Ancient / Rusted", "Cybernetically Enhanced", "Overgrown with Nature"] },
       { id: "prop_material", label: "Material", type: "select", options: ["Scrap Metal", "Obsidian", "Glowing Crystal", "Carved Bone", "Damascus Steel", "Matte Plastic", "Polished Wood", "Rusted Iron", "Ethereal Energy"] }
     ]
@@ -146,6 +146,16 @@ export const config: Record<string, any> = {
       { id: "model_material", label: "Material", type: "select", options: ["Matte Plastic", "Brushed Metal", "Glossy Ceramic", "Rough Stone", "Clear Glass", "Holographic"] },
       { id: "model_polycount", label: "Poly Count", type: "select", options: ["Low Poly", "Mid Poly", "High Poly", "Sculpted Detail", "Voxel"] },
       { id: "model_texture", label: "Texture Resolution", type: "select", options: ["Pixel Art (Pixelated)", "Stylized (Hand-painted)", "PBR Realistic (4K)", "Untextured (Clay Render)"] }
+    ]
+  },
+  P: {
+    label: "✨ Logo & Branding",
+    role: "Lead Brand Designer and Corporate Identity Specialist",
+    layouts: { P0: "Centered Logo on Solid Background", P1: "Logo with Typography/Wordmark", P2: "App Icon Design", P3: "Brand Identity Mockup (Business Cards, Letterhead)" },
+    attrs: [
+      { id: "logo_style", label: "Style", type: "select", options: ["Minimalist", "Vintage / Retro", "Mascot / Character", "Abstract / Geometric", "Hand-drawn / Organic", "Corporate / Professional", "3D / Embossed", "Cyberpunk / Neon"] },
+      { id: "logo_color", label: "Color Palette", type: "select", options: ["Monochrome", "Black and White", "Pastel", "Neon / Vibrant", "Earthy / Natural", "Gradient", "Gold / Luxury", "Primary Colors"] },
+      { id: "logo_background", label: "Background", type: "select", options: ["Transparent / White", "Dark / Black", "Textured Paper", "Gradient Backdrop", "Contextual Mockup"] }
     ]
   }
 };

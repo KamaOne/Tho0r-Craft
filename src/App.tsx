@@ -20,6 +20,22 @@ interface Preset {
   attrs: Record<string, string>;
 }
 
+const PREDEFINED_SUBJECTS = [
+  { label: "--- Select a Subject Template ---", value: "" },
+  { label: "Fantasy Creature", value: "A majestic fantasy creature with glowing eyes and ethereal wings" },
+  { label: "Sci-Fi Vehicle", value: "A sleek, futuristic sci-fi hover vehicle speeding through a neon-lit canyon" },
+  { label: "Historical Architecture", value: "An ancient, ornate gothic cathedral with towering spires and stained glass" },
+  { label: "Portrait", value: "A highly detailed cinematic portrait of a weathered warrior with intricate armor" },
+  { label: "Landscape", value: "A breathtaking epic landscape featuring floating islands and cascading waterfalls" },
+  { label: "Cyberpunk Cityscape", value: "A sprawling cyberpunk cityscape at night, illuminated by holographic advertisements and rain-slicked streets" },
+  { label: "Steampunk Gadget", value: "A complex steampunk gadget made of brass, gears, and glowing vacuum tubes" },
+  { label: "Magical Artifact", value: "An ancient magical artifact resting on a stone pedestal, emitting a faint magical aura" },
+  { label: "Deep Space Nebula", value: "A vibrant deep space nebula with swirling clouds of cosmic dust and bright stars" },
+  { label: "Post-Apocalyptic Ruin", value: "A post-apocalyptic ruined city overgrown with lush, mutated vegetation" },
+  { label: "Cute Animal Mascot", value: "A cute, fluffy animal mascot wearing a tiny adventurer's backpack" },
+  { label: "Epic Battle Scene", value: "An epic battle scene between two colossal mechs in a ruined desert" }
+];
+
 export default function App() {
   const [category, setCategory] = useState('A');
   const [layout, setLayout] = useState('A0');
@@ -984,6 +1000,24 @@ export default function App() {
                     />
                   </div>
                 </div>
+                <div className="mb-3">
+                  <select 
+                    value={PREDEFINED_SUBJECTS.some(s => s.value === subject) ? subject : "custom"}
+                    onChange={(e) => {
+                      if (e.target.value !== "custom") {
+                        setSubject(e.target.value);
+                      }
+                    }}
+                    className="w-full p-3 rounded-xl text-xs font-bold text-theme-accent bg-theme-panel border border-theme-border focus:border-theme-accent outline-none transition-all"
+                  >
+                    {!PREDEFINED_SUBJECTS.some(s => s.value === subject) && subject !== "" && (
+                      <option value="custom">Custom Subject...</option>
+                    )}
+                    {PREDEFINED_SUBJECTS.map((s, i) => (
+                      <option key={i} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
                 <textarea 
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
@@ -1009,15 +1043,25 @@ export default function App() {
                 </div>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {['worst quality', 'low quality', 'blurry', 'text', 'watermark'].map(neg => {
-                    const isActive = customNegPrompt.includes(neg);
+                    const parsed = customNegPrompt.split(',').map(p => p.trim()).filter(Boolean).map(p => {
+                      const m = p.match(/^(.*?)(?:::([0-9.]+))?$/);
+                      return m ? m[1].trim() : p;
+                    });
+                    const isActive = parsed.includes(neg);
                     return (
                       <button
                         key={neg}
                         onClick={() => {
                           setCustomNegPrompt(prev => {
                             const parts = prev.split(',').map(p => p.trim()).filter(Boolean);
-                            if (parts.includes(neg)) {
-                              return parts.filter(p => p !== neg).join(', ');
+                            const existingIdx = parts.findIndex(p => {
+                              const m = p.match(/^(.*?)(?:::([0-9.]+))?$/);
+                              return (m ? m[1].trim() : p) === neg;
+                            });
+                            
+                            if (existingIdx >= 0) {
+                              parts.splice(existingIdx, 1);
+                              return parts.join(', ');
                             } else {
                               return [...parts, neg].join(', ');
                             }
@@ -1039,8 +1083,43 @@ export default function App() {
                   onChange={(e) => setCustomNegPrompt(e.target.value)}
                   rows={2} 
                   className="w-full p-4 rounded-xl resize-none bg-theme-bg border border-theme-border text-theme-text focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 outline-none transition-all" 
-                  placeholder="Ex: worst quality, low quality, blurry, text, watermark..."
+                  placeholder="Ex: worst quality, low quality, blurry::2, text, watermark..."
                 />
+                {customNegPrompt.trim() && (
+                  <div className="mt-4 space-y-3">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted">Keyword Weights</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {customNegPrompt.split(',').map(p => p.trim()).filter(Boolean).map((p, idx) => {
+                        const match = p.match(/^(.*?)(?:::([0-9.]+))?$/);
+                        const base = match ? match[1].trim() : p;
+                        const weight = match && match[2] ? parseFloat(match[2]) : 1;
+                        
+                        return (
+                          <div key={idx} className="flex items-center gap-2 bg-theme-panel p-2 rounded-lg border border-theme-border">
+                            <span className="text-xs text-theme-text truncate flex-1" title={base}>{base}</span>
+                            <span className="text-[10px] text-theme-muted w-6 text-right">{weight.toFixed(1)}</span>
+                            <input 
+                              type="range" 
+                              min="0.1" 
+                              max="3.0" 
+                              step="0.1" 
+                              value={weight}
+                              onChange={(e) => {
+                                const newWeight = parseFloat(e.target.value);
+                                setCustomNegPrompt(prev => {
+                                  const parts = prev.split(',').map(part => part.trim()).filter(Boolean);
+                                  parts[idx] = newWeight === 1 ? base : `${base}::${newWeight}`;
+                                  return parts.join(', ');
+                                });
+                              }}
+                              className="w-20 accent-red-500"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
             </div>
