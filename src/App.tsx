@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn } from 'lucide-react';
+import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { config, angles, stylesData, stylesValue, lightsData, lightsValue, bgsData, bgsValue } from './data';
 import { LiveAssistant } from './components/LiveAssistant';
@@ -38,7 +38,8 @@ export default function App() {
   const [lens, setLens] = useState('');
   const [aspect, setAspect] = useState('');
   const [img2img, setImg2img] = useState(false);
-  const [negPrompt, setNegPrompt] = useState(true);
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [img2imgStrength, setImg2imgStrength] = useState<number>(50);
   const [customNegPrompt, setCustomNegPrompt] = useState('worst quality, low quality, normal quality, watermark, signature, text, blurry, deformed, ugly, bad anatomy, extra fingers, mutated hands, cropped, bad proportions, disfigured face, asymmetric eyes');
 
   const [generatedPrompt, setGeneratedPrompt] = useState('');
@@ -60,13 +61,18 @@ export default function App() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [presetToDelete, setPresetToDelete] = useState<string | null>(null);
   const [isNarratorActive, setIsNarratorActive] = useState(false);
   const [isMagnifierActive, setIsMagnifierActive] = useState(false);
+  const [activeTab, setActiveTab] = useState('subject');
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [gallery, setGallery] = useState<{image: string, prompt: string, time: string}[]>([]);
+  const [gallery, setGallery] = useState<{image: string, prompt: string, time: string, category: string, timestamp: number}[]>([]);
+  const [gallerySort, setGallerySort] = useState<'date_desc' | 'date_asc' | 'prompt' | 'category'>('date_desc');
+  const [galleryFilter, setGalleryFilter] = useState<string>('All');
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -157,7 +163,7 @@ export default function App() {
   // Generate prompt whenever inputs change
   useEffect(() => {
     generatePrompt();
-  }, [category, layout, subject, style, lighting, background, sliderS, sliderC, sliderW, selectedAngles, attributes, lens, aspect, img2img, negPrompt, customNegPrompt, isRotationEnabled]);
+  }, [category, layout, subject, style, lighting, background, sliderS, sliderC, sliderW, selectedAngles, attributes, lens, aspect, img2img, img2imgStrength, referenceImage, customNegPrompt, isRotationEnabled]);
 
   const generatePrompt = () => {
     const catConfig = config[category];
@@ -176,7 +182,19 @@ export default function App() {
       
     let prompt = `**[Role]** ${role}.\n`;
     prompt += `**[Task]** Create a professional ${layoutName} representation.\n`;
-    if (img2img) prompt += `**[CRITICAL REFERENCE]** Strictly match image features...\n`;
+    
+    if (img2img && referenceImage) {
+      if (img2imgStrength > 80) {
+        prompt += `**[CRITICAL REFERENCE]** Strictly adhere to the original image's structure, composition, and colors. Only make minimal, subtle changes as requested. Strength: ${img2imgStrength}%\n`;
+      } else if (img2imgStrength > 40) {
+        prompt += `**[REFERENCE]** Maintain the general structure and colors of the original image but apply the requested changes. Strength: ${img2imgStrength}%\n`;
+      } else {
+        prompt += `**[LOOSE REFERENCE]** Use the image as a loose inspiration. Feel free to change colors, shapes, and composition significantly. Strength: ${img2imgStrength}%\n`;
+      }
+    } else if (img2img) {
+      prompt += `**[CRITICAL REFERENCE]** Strictly match image features...\n`;
+    }
+    
     prompt += `**[Subject]** ${subj}\n`;
     if (attrValues) prompt += `**[Visual DNA]** ${attrValues}\n`;
     prompt += `**[Art Style]** ${stylesValue[style]}\n`;
@@ -188,7 +206,7 @@ export default function App() {
       prompt += `\n**[Rotation]** 360 degree turnaround`;
     }
     if (aspect) prompt += ` ${aspect}`;
-    if (negPrompt) prompt += ` --no ${customNegPrompt}`;
+    if (customNegPrompt.trim()) prompt += ` --no ${customNegPrompt.trim()}`;
     
     setGeneratedPrompt(prompt);
   };
@@ -250,11 +268,37 @@ export default function App() {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
-      // Clean up prompt for Gemini (remove Midjourney specific flags)
+      // Clean up prompt for Gemini (remove Midjourney specific flags and conversational parts)
       let cleanPrompt = generatedPrompt.split('**[Parameters]**')[0];
-      if (negPrompt && customNegPrompt) {
-          cleanPrompt += `\nDo not include: ${customNegPrompt}`;
+      cleanPrompt = cleanPrompt.replace(/\*\*\[Role\]\*\*.*\n?/g, '');
+      cleanPrompt = cleanPrompt.replace(/\*\*\[Task\]\*\*.*\n?/g, '');
+      cleanPrompt = cleanPrompt.replace(/\*\*\[CRITICAL REFERENCE\]\*\*.*\n?/g, '');
+      cleanPrompt = cleanPrompt.replace(/\*\*\[Subject\]\*\*/g, '');
+      cleanPrompt = cleanPrompt.replace(/\*\*\[Visual DNA\]\*\*/g, '');
+      cleanPrompt = cleanPrompt.replace(/\*\*\[Art Style\]\*\*/g, '');
+      cleanPrompt = cleanPrompt.replace(/\*\*\[Camera\]\*\*/g, '');
+      cleanPrompt = cleanPrompt.replace(/\*\*\[Ambiance\]\*\*/g, '');
+      cleanPrompt = cleanPrompt.replace(/\n/g, ', ').replace(/,\s*,/g, ',').trim();
+      
+      if (customNegPrompt.trim()) {
+          cleanPrompt += `\nDo not include: ${customNegPrompt.trim()}`;
       }
+
+      const getParts = (promptText: string) => {
+        const parts: any[] = [];
+        if (img2img && referenceImage) {
+          const mimeType = referenceImage.match(/data:(.*?);/)?.[1] || 'image/png';
+          const base64Data = referenceImage.split(',')[1];
+          parts.push({
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType
+            }
+          });
+        }
+        parts.push({ text: promptText });
+        return parts;
+      };
 
       if (isRotationEnabled && category === 'G') {
         const angles360 = ["front view", "right side profile view", "back view", "left side profile view"];
@@ -262,7 +306,7 @@ export default function App() {
           return ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: {
-              parts: [{ text: `${cleanPrompt}, ${angle}` }]
+              parts: getParts(`${cleanPrompt}, ${angle}`)
             },
             config: {
               imageConfig: {
@@ -275,18 +319,28 @@ export default function App() {
         const responses = await Promise.all(promises);
         const images = responses.map(res => {
           const candidate = res.candidates?.[0];
-          const part = candidate?.content?.parts?.find(p => p.inlineData);
-          if (!part?.inlineData?.data) {
-             const textPart = candidate?.content?.parts?.find(p => p.text);
-             console.error("Rotation image failed:", textPart?.text || candidate?.finishReason || "Unknown error");
+          const imagePart = candidate?.content?.parts?.find(p => p.inlineData || (p as any).inline_data);
+          const inlineData = imagePart?.inlineData || (imagePart as any)?.inline_data;
+          const generatedImages = (res as any).generatedImages || (res as any).generated_images;
+          
+          if (inlineData?.data) {
+            return `data:image/png;base64,${inlineData.data}`;
+          } else if (generatedImages && generatedImages.length > 0) {
+            const imgBytes = generatedImages[0].image?.imageBytes || generatedImages[0].image?.image_bytes;
+            if (imgBytes) {
+              return `data:image/png;base64,${imgBytes}`;
+            }
           }
-          return part?.inlineData?.data ? `data:image/png;base64,${part.inlineData.data}` : null;
+          
+          const textPart = candidate?.content?.parts?.find(p => p.text);
+          console.error("Rotation image failed:", textPart?.text || candidate?.finishReason || "Unknown error");
+          return null;
         }).filter(Boolean) as string[];
 
         if (images.length > 0) {
           setRotationImages(images);
           setGeneratedImage(images[0]);
-          setGallery(prev => [{ image: images[0], prompt: generatedPrompt, time: new Date().toLocaleTimeString() }, ...prev]);
+          setGallery(prev => [{ image: images[0], prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
         } else {
           throw new Error("No image data returned for rotation. This may be due to safety filters or an invalid prompt.");
         }
@@ -294,9 +348,7 @@ export default function App() {
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
           contents: {
-            parts: [
-              { text: cleanPrompt }
-            ]
+            parts: getParts(cleanPrompt)
           },
           config: {
             imageConfig: {
@@ -305,13 +357,32 @@ export default function App() {
           }
         });
 
+        console.log("Full response:", JSON.stringify(response, null, 2));
+
         const candidate = response.candidates?.[0];
-        const imagePart = candidate?.content?.parts?.find(p => p.inlineData);
+        const imagePart = candidate?.content?.parts?.find(p => p.inlineData || (p as any).inline_data || p.fileData || (p as any).file_data);
         
-        if (imagePart?.inlineData?.data) {
-          const imgData = `data:image/png;base64,${imagePart.inlineData.data}`;
+        const inlineData = imagePart?.inlineData || (imagePart as any)?.inline_data;
+        const fileData = imagePart?.fileData || (imagePart as any)?.file_data;
+        
+        const generatedImages = (response as any).generatedImages || (response as any).generated_images;
+        
+        if (inlineData?.data) {
+          const imgData = `data:image/png;base64,${inlineData.data}`;
           setGeneratedImage(imgData);
-          setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString() }, ...prev]);
+          setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+        } else if (generatedImages && generatedImages.length > 0) {
+          const imgBytes = generatedImages[0].image?.imageBytes || generatedImages[0].image?.image_bytes;
+          if (imgBytes) {
+            const imgData = `data:image/png;base64,${imgBytes}`;
+            setGeneratedImage(imgData);
+            setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+          } else {
+            throw new Error("generatedImages found but no imageBytes");
+          }
+        } else if (fileData?.fileUri) {
+          // If it returns fileData, we can't easily display it without fetching, but let's log it
+          throw new Error(`Model returned fileData: ${fileData.fileUri}`);
         } else {
           const textPart = candidate?.content?.parts?.find(p => p.text);
           const finishReason = candidate?.finishReason;
@@ -432,7 +503,7 @@ export default function App() {
   };
 
   const savePreset = () => {
-    if (!presetName.trim()) return alert("Name required");
+    if (!presetName.trim()) return;
     const newPresets = {
       ...presets,
       [presetName]: {
@@ -470,19 +541,40 @@ export default function App() {
     setAttributes(p.attrs || {});
   };
 
-  const deletePreset = (name: string) => {
-    if (confirm("Delete preset?")) {
+  const confirmDeletePreset = (name: string) => {
+    setPresetToDelete(name);
+  };
+
+  const executeDeletePreset = () => {
+    if (presetToDelete) {
       const newPresets = { ...presets };
-      delete newPresets[name];
+      delete newPresets[presetToDelete];
       setPresets(newPresets);
       localStorage.setItem('promptcraft_presets', JSON.stringify(newPresets));
+      setPresetToDelete(null);
     }
   };
+
+  const filteredAndSortedGallery = [...gallery]
+    .filter(item => galleryFilter === 'All' || (item.category || 'Unknown') === galleryFilter)
+    .sort((a, b) => {
+      const timeA = a.timestamp || 0;
+      const timeB = b.timestamp || 0;
+      const catA = a.category || 'Unknown';
+      const catB = b.category || 'Unknown';
+      
+      if (gallerySort === 'date_desc') return timeB - timeA;
+      if (gallerySort === 'date_asc') return timeA - timeB;
+      if (gallerySort === 'prompt') return a.prompt.localeCompare(b.prompt);
+      if (gallerySort === 'category') return catA.localeCompare(catB);
+      return 0;
+    });
 
   return (
     <div className="min-h-screen p-4 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
-        <header className="mb-12 text-center relative">
+        <header className="mb-12 text-center relative flex flex-col items-center">
+          <img src="/logo.png" alt="Tho0r-Craft Logo" className="h-40 mb-2 object-contain drop-shadow-[0_0_25px_rgba(255,215,0,0.3)]" onError={(e) => e.currentTarget.style.display = 'none'} />
           <h1 className="text-5xl font-extrabold mb-3 tracking-tighter gradient-text">Tho0r-Craft</h1>
           <p className="text-theme-muted font-medium tracking-wide uppercase italic">Director Console • Ultimate Edition</p>
           
@@ -508,7 +600,7 @@ export default function App() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           {/* LEFT: CONFIGURATION */}
-          <div className="lg:col-span-7 space-y-8">
+          <div className={`lg:col-span-7 space-y-8 ${isFocusMode ? 'hidden' : 'block'}`}>
             <div className="glass-card p-8 rounded-3xl">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold flex items-center gap-3 text-theme-accent uppercase tracking-widest">
@@ -548,89 +640,323 @@ export default function App() {
                     Object.keys(presets).map(name => (
                       <div key={name} className="inline-flex items-center text-[0.75rem] px-3 py-1 rounded-full bg-theme-accent/10 border border-theme-border text-theme-accent cursor-pointer hover:bg-theme-accent/20 transition-all">
                         <span onClick={() => loadPreset(name)}>{name}</span>
-                        <span className="ml-2 opacity-60 hover:opacity-100 hover:text-red-500" onClick={() => deletePreset(name)}>×</span>
+                        <span className="ml-2 opacity-60 hover:opacity-100 hover:text-red-500" onClick={() => confirmDeletePreset(name)}>×</span>
                       </div>
                     ))
                   )}
                 </div>
               </div>
 
-              {/* CAT & LAYOUT */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Category</label>
-                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-4 rounded-xl font-bold text-theme-accent">
-                    {Object.entries(config).map(([k, v]) => (
-                      <option key={k} value={k}>{v.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Structure Layout</label>
-                  <select value={layout} onChange={(e) => setLayout(e.target.value)} className="w-full p-4 rounded-xl">
-                    {Object.entries(config[category].layouts).map(([k, v]) => (
-                      <option key={k} value={k}>{v as string}</option>
-                    ))}
-                  </select>
-                </div>
+              {/* TABS NAVIGATION */}
+              <div className="flex gap-2 mb-8 border-b border-theme-border pb-4 overflow-x-auto">
+                <button 
+                  onClick={() => setActiveTab('subject')}
+                  className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all flex-shrink-0 flex items-center gap-2 ${activeTab === 'subject' ? 'bg-theme-accent text-theme-bg' : 'bg-theme-panel text-theme-muted hover:text-theme-text border border-theme-border'}`}
+                >
+                  <Layers className="w-4 h-4" /> Sujet & ADN
+                </button>
+                <button 
+                  onClick={() => setActiveTab('camera')}
+                  className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all flex-shrink-0 flex items-center gap-2 ${activeTab === 'camera' ? 'bg-theme-accent text-theme-bg' : 'bg-theme-panel text-theme-muted hover:text-theme-text border border-theme-border'}`}
+                >
+                  <Camera className="w-4 h-4" /> Caméra & Ambiance
+                </button>
+                <button 
+                  onClick={() => setActiveTab('post')}
+                  className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all flex-shrink-0 flex items-center gap-2 ${activeTab === 'post' ? 'bg-theme-accent text-theme-bg' : 'bg-theme-panel text-theme-muted hover:text-theme-text border border-theme-border'}`}
+                >
+                  <Sliders className="w-4 h-4" /> Post-Production
+                </button>
               </div>
 
-              {/* ROTATION 360 (ONLY FOR ANATOMY) */}
-              {category === 'G' && (
-                <div className="mb-8 p-5 bg-theme-panel rounded-2xl border border-theme-border">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={isRotationEnabled}
-                      onChange={(e) => setIsRotationEnabled(e.target.checked)}
-                      className="w-5 h-5 rounded border-theme-border text-theme-accent focus:ring-theme-accent bg-theme-bg"
-                    />
-                    <span className="text-sm font-bold text-theme-text">Activer la Rotation 360° (4 angles générés)</span>
-                  </label>
-                </div>
-              )}
-
-              {/* ANGLES */}
-              <div className="mb-8 p-4 bg-theme-panel rounded-2xl border border-theme-border">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-theme-accent mb-3 italic">1. Camera Angles - Sequence</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  {angles.map(angle => (
-                    <div 
-                      key={angle.id}
-                      onClick={() => toggleAngle(angle.id)}
-                      className={`cursor-pointer transition-all border border-theme-border bg-theme-panel text-[0.7rem] uppercase tracking-wider p-2 rounded-lg text-center select-none
-                        ${selectedAngles.includes(angle.id) ? 'bg-theme-accent border-theme-accent text-theme-bg font-bold shadow-lg' : 'text-theme-muted hover:border-theme-accent hover:text-theme-text'}`}
-                    >
-                      {angle.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* ATTRIBUTES */}
-              <div className="p-6 bg-theme-accent/5 border border-theme-border rounded-2xl mb-8">
-                <label className="block text-[11px] font-black uppercase tracking-widest text-theme-accent mb-4">2. Visual DNA & Textures</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {config[category].attrs.map((attr: any) => (
-                    <div key={attr.id}>
-                      <label className="block text-[9px] text-theme-muted mb-1 font-black uppercase tracking-widest">{attr.label}</label>
-                      <select 
-                        value={attributes[attr.id] || ''} 
-                        onChange={(e) => setAttributes({...attributes, [attr.id]: e.target.value})}
-                        className="w-full p-3 text-xs rounded-xl"
-                      >
-                        <option value="">-- Choose --</option>
-                        {attr.options.map((o: string) => (
-                          <option key={o} value={o}>{o}</option>
+              {/* TAB CONTENT: SUBJECT */}
+              {activeTab === 'subject' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {/* CAT & LAYOUT */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Category</label>
+                      <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-4 rounded-xl font-bold text-theme-accent">
+                        {Object.entries(config).map(([k, v]) => (
+                          <option key={k} value={k}>{v.label}</option>
                         ))}
                       </select>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Structure Layout</label>
+                      <select value={layout} onChange={(e) => setLayout(e.target.value)} className="w-full p-4 rounded-xl">
+                        {Object.entries(config[category].layouts).map(([k, v]) => (
+                          <option key={k} value={k}>{v as string}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-              {/* SUBJECT */}
-              <div className="mb-8 relative">
+                  {/* ROTATION 360 (ONLY FOR ANATOMY) */}
+                  {category === 'G' && (
+                    <div className="p-5 bg-theme-panel rounded-2xl border border-theme-border">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={isRotationEnabled}
+                          onChange={(e) => setIsRotationEnabled(e.target.checked)}
+                          className="w-5 h-5 rounded border-theme-border text-theme-accent focus:ring-theme-accent bg-theme-bg"
+                        />
+                        <span className="text-sm font-bold text-theme-text">Activer la Rotation 360° (4 angles générés)</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB CONTENT: CAMERA */}
+              {activeTab === 'camera' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {/* ANGLES */}
+                  <div className="p-4 bg-theme-panel rounded-2xl border border-theme-border">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-theme-accent mb-3 italic">1. Camera Angles - Sequence</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                      {angles.map(angle => {
+                        const getAngleIcon = (id: string) => {
+                          switch(id) {
+                            case 'front': return <Eye className="w-3 h-3" />;
+                            case 'profile_l': case 'profile_r': return <Scan className="w-3 h-3" />;
+                            case 'back': return <Camera className="w-3 h-3" />;
+                            case 'perspective': return <Video className="w-3 h-3" />;
+                            case 'top_down': case 'high_view': return <Aperture className="w-3 h-3" />;
+                            case 'low': return <Focus className="w-3 h-3" />;
+                            case 'closeup': return <Crosshair className="w-3 h-3" />;
+                            case 'wide': return <Maximize2 className="w-3 h-3" />;
+                            default: return <Camera className="w-3 h-3" />;
+                          }
+                        };
+                        return (
+                          <div 
+                            key={angle.id}
+                            onClick={() => toggleAngle(angle.id)}
+                            className={`cursor-pointer transition-all border border-theme-border bg-theme-panel text-[0.7rem] uppercase tracking-wider p-2 rounded-lg text-center select-none flex flex-col items-center justify-center gap-1
+                              ${selectedAngles.includes(angle.id) ? 'bg-theme-accent border-theme-accent text-theme-bg font-bold shadow-lg' : 'text-theme-muted hover:border-theme-accent hover:text-theme-text'}`}
+                          >
+                            {getAngleIcon(angle.id)}
+                            <span>{angle.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* ATTRIBUTES */}
+                  <div className="p-6 bg-theme-accent/5 border border-theme-border rounded-2xl">
+                    <label className="block text-[11px] font-black uppercase tracking-widest text-theme-accent mb-4">2. Visual DNA & Textures</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {config[category].attrs.map((attr: any) => (
+                        <div key={attr.id}>
+                          <label className="block text-[9px] text-theme-muted mb-1 font-black uppercase tracking-widest">{attr.label}</label>
+                          <select 
+                            value={attributes[attr.id] || ''} 
+                            onChange={(e) => setAttributes({...attributes, [attr.id]: e.target.value})}
+                            className="w-full p-3 text-xs rounded-xl"
+                          >
+                            <option value="">-- Choose --</option>
+                            {attr.options.map((o: string) => (
+                              <option key={o} value={o}>{o}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* TECHNIQUE */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Art Direction</label>
+                      <select value={style} onChange={(e) => setStyle(e.target.value)} className="w-full p-3 rounded-xl text-sm">
+                        {Object.entries(stylesData).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Lighting</label>
+                      <select value={lighting} onChange={(e) => setLighting(e.target.value)} className="w-full p-3 rounded-xl text-sm">
+                        {Object.entries(lightsData).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Background</label>
+                      <select value={background} onChange={(e) => setBackground(e.target.value)} className="w-full p-3 rounded-xl text-sm">
+                        {Object.entries(bgsData).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* OPTICS */}
+                  <div className="p-5 bg-theme-panel rounded-2xl border border-theme-border">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-theme-accent mb-3">Optics</label>
+                    <div className="flex flex-col gap-4">
+                      <select value={lens} onChange={(e) => setLens(e.target.value)} className="p-2 text-xs rounded-lg w-full bg-theme-bg border border-theme-border text-theme-text focus:border-theme-accent outline-none transition-colors">
+                        <option value="">Lens: Auto</option>
+                        <option value="85mm lens f/1.8">Portrait (85mm)</option>
+                        <option value="35mm lens">Standard (35mm)</option>
+                        <option value="24mm wide angle">Wide (24mm)</option>
+                      </select>
+                      
+                      <div>
+                        <label className="block text-[9px] font-bold uppercase tracking-wider text-theme-muted mb-2">Aspect Ratio</label>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { label: '1:1', value: '' },
+                            { label: '16:9', value: '--ar 16:9' },
+                            { label: '9:16', value: '--ar 9:16' },
+                            { label: '4:3', value: '--ar 4:3' },
+                            { label: '3:4', value: '--ar 3:4' }
+                          ].map((ratio) => (
+                            <button
+                              key={ratio.label}
+                              onClick={() => setAspect(ratio.value)}
+                              className={`flex-1 py-2 px-1 text-[10px] font-bold rounded-lg border transition-all flex flex-col items-center justify-center gap-1.5 ${
+                                aspect === ratio.value 
+                                  ? 'bg-theme-accent text-theme-bg border-theme-accent shadow-md' 
+                                  : 'bg-theme-bg text-theme-muted border-theme-border hover:border-theme-accent hover:text-theme-text'
+                              }`}
+                            >
+                              <div 
+                                className={`border-2 rounded-sm transition-all duration-300 ${aspect === ratio.value ? 'border-theme-bg' : 'border-theme-muted'}`} 
+                                style={{ 
+                                  width: ratio.value === '--ar 16:9' ? '16px' : ratio.value === '--ar 4:3' ? '14px' : ratio.value === '--ar 9:16' ? '9px' : ratio.value === '--ar 3:4' ? '10.5px' : '14px',
+                                  height: ratio.value === '--ar 16:9' ? '9px' : ratio.value === '--ar 4:3' ? '10.5px' : ratio.value === '--ar 9:16' ? '16px' : ratio.value === '--ar 3:4' ? '14px' : '14px',
+                                }} 
+                              />
+                              {ratio.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB CONTENT: POST-PRODUCTION */}
+              {activeTab === 'post' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {/* POST-PROD SLIDERS */}
+                  <div className="p-5 bg-theme-panel rounded-2xl border border-theme-border">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-theme-accent mb-4">Post-Production (Advanced)</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="group relative">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[10px] uppercase text-theme-muted flex items-center gap-1">Stylize (S)</span>
+                          <span className="text-[10px] font-mono text-theme-accent">{sliderS}</span>
+                        </div>
+                        <input type="range" min="0" max="1000" value={sliderS} onChange={(e) => setSliderS(e.target.value)} className="w-full" />
+                        <p className="text-[10px] text-theme-muted mt-2 leading-tight opacity-80">
+                          <strong>Stylize:</strong> Controls the strength of the artistic style. Lower values (0) produce raw, literal images. Higher values (1000) produce highly artistic, stylized images.
+                        </p>
+                      </div>
+                      <div className="group relative">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[10px] uppercase text-theme-muted flex items-center gap-1">Chaos (C)</span>
+                          <span className="text-[10px] font-mono text-theme-accent">{sliderC}</span>
+                        </div>
+                        <input type="range" min="0" max="100" value={sliderC} onChange={(e) => setSliderC(e.target.value)} className="w-full" />
+                        <p className="text-[10px] text-theme-muted mt-2 leading-tight opacity-80">
+                          <strong>Chaos:</strong> Determines the variety of the results. Lower values (0) produce consistent, similar variations. Higher values (100) produce unexpected, unpredictable results.
+                        </p>
+                      </div>
+                      <div className="group relative">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[10px] uppercase text-theme-muted flex items-center gap-1">Weird (W)</span>
+                          <span className="text-[10px] font-mono text-theme-accent">{sliderW}</span>
+                        </div>
+                        <input type="range" min="0" max="3000" value={sliderW} onChange={(e) => setSliderW(e.target.value)} className="w-full" />
+                        <p className="text-[10px] text-theme-muted mt-2 leading-tight opacity-80">
+                          <strong>Weird:</strong> Adds an unconventional, quirky touch. Lower values (0) are normal. Higher values (3000) introduce strange, surreal, and highly unusual elements.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EXTRA OPTIONS */}
+                  <div className="flex flex-col gap-4 p-5 bg-theme-panel rounded-2xl border border-theme-border">
+                    <div className="flex items-center gap-6 px-4 flex-wrap">
+                      <label className="flex items-center gap-3 cursor-pointer group">
+                        <input type="checkbox" checked={img2img} onChange={(e) => setImg2img(e.target.checked)} className="w-5 h-5 rounded text-theme-accent bg-theme-panel border-theme-border" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-theme-muted group-hover:text-theme-accent">Img2Img</span>
+                      </label>
+                    </div>
+
+                    {img2img && (
+                      <div className="mt-4 p-4 bg-theme-bg/50 rounded-xl border border-theme-border/50 space-y-4">
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-theme-accent flex items-center gap-2">
+                            <ImageIcon className="w-4 h-4" /> Reference Image
+                          </label>
+                          <p className="text-[10px] text-theme-muted leading-tight">
+                            Upload an image to use as a structural and visual reference.
+                          </p>
+                          <div className="flex items-center gap-4">
+                            <label className="cursor-pointer bg-theme-accent/10 hover:bg-theme-accent/20 text-theme-accent px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border border-theme-accent/20">
+                              <Upload className="w-3 h-3" /> {referenceImage ? 'Change Image' : 'Upload Image'}
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setReferenceImage(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }} 
+                              />
+                            </label>
+                            {referenceImage && (
+                              <button 
+                                onClick={() => setReferenceImage(null)}
+                                className="text-xs text-red-400 hover:text-red-300 px-3 py-2 rounded-lg hover:bg-red-400/10 transition-all"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                          {referenceImage && (
+                            <div className="mt-2 relative w-24 h-24 rounded-lg overflow-hidden border border-theme-border">
+                              <img src={referenceImage} alt="Reference" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-2">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-[10px] uppercase text-theme-muted flex items-center gap-1">Influence Strength</span>
+                            <span className="text-[10px] font-mono text-theme-accent">{img2imgStrength}%</span>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="0" 
+                            max="100" 
+                            value={img2imgStrength} 
+                            onChange={(e) => setImg2imgStrength(Number(e.target.value))} 
+                            className="w-full" 
+                          />
+                          <p className="text-[10px] text-theme-muted mt-2 leading-tight opacity-80">
+                            <strong>{img2imgStrength > 80 ? 'Strict:' : img2imgStrength > 40 ? 'Moderate:' : 'Loose:'}</strong> 
+                            {img2imgStrength > 80 
+                              ? ' The AI will closely follow the original image structure and colors.' 
+                              : img2imgStrength > 40 
+                                ? ' The AI will use the image as a strong guide but allow some creative freedom.' 
+                                : ' The AI will use the image as loose inspiration, allowing significant changes.'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SUBJECT (ALWAYS VISIBLE AT BOTTOM OF CONFIG) */}
+              <div className="mt-8 relative">
                 <div className="flex justify-between items-center mb-2">
                   <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted">3. Free Narrative Description</label>
                   <div className="flex gap-2">
@@ -662,109 +988,77 @@ export default function App() {
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   rows={2} 
-                  className="w-full p-4 rounded-xl resize-none" 
+                  className="w-full p-4 rounded-xl resize-none bg-theme-bg border border-theme-border text-theme-text focus:border-theme-accent/50 focus:ring-1 focus:ring-theme-accent/50 outline-none transition-all" 
                   placeholder="Ex: A majestic lion, a mechanical dragon..."
                 />
               </div>
 
-              {/* TECHNIQUE */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Art Direction</label>
-                  <select value={style} onChange={(e) => setStyle(e.target.value)} className="w-full p-3 rounded-xl text-sm">
-                    {Object.entries(stylesData).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
+              {/* NEGATIVE PROMPT */}
+              <div className="mt-8 relative">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted">4. Negative Prompt (Exclude)</label>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setCustomNegPrompt('')}
+                      className="text-[10px] bg-theme-panel border border-theme-border hover:border-red-500/50 hover:text-red-400 px-2 py-1 rounded-full text-theme-text transition-colors flex items-center justify-center"
+                      title="Clear negative prompt"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Lighting</label>
-                  <select value={lighting} onChange={(e) => setLighting(e.target.value)} className="w-full p-3 rounded-xl text-sm">
-                    {Object.entries(lightsData).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {['worst quality', 'low quality', 'blurry', 'text', 'watermark'].map(neg => {
+                    const isActive = customNegPrompt.includes(neg);
+                    return (
+                      <button
+                        key={neg}
+                        onClick={() => {
+                          setCustomNegPrompt(prev => {
+                            const parts = prev.split(',').map(p => p.trim()).filter(Boolean);
+                            if (parts.includes(neg)) {
+                              return parts.filter(p => p !== neg).join(', ');
+                            } else {
+                              return [...parts, neg].join(', ');
+                            }
+                          });
+                        }}
+                        className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                          isActive 
+                            ? 'bg-red-500/20 border-red-500/50 text-red-400' 
+                            : 'bg-theme-panel border-theme-border text-theme-muted hover:border-red-500/30 hover:text-red-400'
+                        }`}
+                      >
+                        {isActive ? '-' : '+'} {neg}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Background</label>
-                  <select value={background} onChange={(e) => setBackground(e.target.value)} className="w-full p-3 rounded-xl text-sm">
-                    {Object.entries(bgsData).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
-                </div>
+                <textarea 
+                  value={customNegPrompt}
+                  onChange={(e) => setCustomNegPrompt(e.target.value)}
+                  rows={2} 
+                  className="w-full p-4 rounded-xl resize-none bg-theme-bg border border-theme-border text-theme-text focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 outline-none transition-all" 
+                  placeholder="Ex: worst quality, low quality, blurry, text, watermark..."
+                />
               </div>
 
-              {/* POST-PROD SLIDERS */}
-              <div className="mb-8 p-5 bg-theme-panel rounded-2xl border border-theme-border">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-theme-accent mb-4">Post-Production (Advanced)</label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <div className="flex justify-between mb-1"><span className="text-[10px] uppercase text-theme-muted">Stylize (S)</span><span className="text-[10px] font-mono text-theme-accent">{sliderS}</span></div>
-                    <input type="range" min="0" max="1000" value={sliderS} onChange={(e) => setSliderS(e.target.value)} />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-1"><span className="text-[10px] uppercase text-theme-muted">Chaos (C)</span><span className="text-[10px] font-mono text-theme-accent">{sliderC}</span></div>
-                    <input type="range" min="0" max="100" value={sliderC} onChange={(e) => setSliderC(e.target.value)} />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-1"><span className="text-[10px] uppercase text-theme-muted">Weird (W)</span><span className="text-[10px] font-mono text-theme-accent">{sliderW}</span></div>
-                    <input type="range" min="0" max="3000" value={sliderW} onChange={(e) => setSliderW(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-
-              {/* FOOTER OPTIONS */}
-              <div className="flex flex-col md:flex-row gap-6">
-                <div className="flex-grow p-5 bg-theme-panel rounded-2xl border border-theme-border">
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-theme-accent mb-3">Optics</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <select value={lens} onChange={(e) => setLens(e.target.value)} className="p-2 text-xs rounded-lg">
-                      <option value="">Lens: Auto</option>
-                      <option value="85mm lens f/1.8">Portrait (85mm)</option>
-                      <option value="35mm lens">Standard (35mm)</option>
-                      <option value="24mm wide angle">Wide (24mm)</option>
-                    </select>
-                    <div className="flex items-center gap-2">
-                      <select value={aspect} onChange={(e) => setAspect(e.target.value)} className="p-2 text-xs rounded-lg flex-grow">
-                        <option value="">Ratio: 1:1 Square</option>
-                        <option value="--ar 16:9">Ratio: 16:9 Cinema</option>
-                        <option value="--ar 9:16">Ratio: 9:16 Mobile</option>
-                        <option value="--ar 4:3">Ratio: 4:3 Standard</option>
-                        <option value="--ar 3:4">Ratio: 3:4 Portrait</option>
-                      </select>
-                      <div 
-                        className="w-6 h-6 border-2 border-theme-accent rounded-sm transition-all duration-300 flex-shrink-0" 
-                        style={{ 
-                          aspectRatio: aspect === '--ar 16:9' ? '16/9' : 
-                                      aspect === '--ar 9:16' ? '9/16' : 
-                                      aspect === '--ar 4:3' ? '4/3' : 
-                                      aspect === '--ar 3:4' ? '3/4' : '1/1' 
-                        }} 
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6 px-4 flex-wrap">
-                  {category === 'G' && (
-                    <label className="flex items-center gap-3 cursor-pointer group">
-                      <input type="checkbox" checked={isRotationEnabled} onChange={(e) => setIsRotationEnabled(e.target.checked)} className="w-5 h-5 rounded text-theme-accent bg-theme-panel border-theme-border" />
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-theme-muted group-hover:text-theme-accent">Rotation 360°</span>
-                    </label>
-                  )}
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input type="checkbox" checked={img2img} onChange={(e) => setImg2img(e.target.checked)} className="w-5 h-5 rounded text-theme-accent bg-theme-panel border-theme-border" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-theme-muted group-hover:text-theme-accent">Img2Img</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input type="checkbox" checked={negPrompt} onChange={(e) => setNegPrompt(e.target.checked)} className="w-5 h-5 rounded text-theme-accent bg-theme-panel border-theme-border" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-theme-muted group-hover:text-theme-accent">Neg Pro</span>
-                  </label>
-                </div>
-              </div>
             </div>
           </div>
 
           {/* RIGHT: OUTPUT & HISTORY */}
-          <div className="lg:col-span-5 flex flex-col gap-6">
-            <div className="glass-card p-8 rounded-3xl border-theme-border shadow-lg">
+          <div className={`${isFocusMode ? 'col-span-1 lg:col-span-12' : 'lg:col-span-5'} flex flex-col gap-6 transition-all duration-500`}>
+            <div className="glass-card p-8 rounded-3xl border-theme-border shadow-lg sticky top-8">
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-xl font-bold text-theme-accent tracking-tighter italic">DIRECTOR'S OUTPUT</h2>
                 <div className="flex gap-2">
+                  <button 
+                    onClick={() => setIsFocusMode(!isFocusMode)}
+                    className="p-2 rounded-full bg-theme-panel border border-theme-border text-theme-muted hover:text-theme-accent transition-colors"
+                    title={isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode"}
+                  >
+                    {isFocusMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  </button>
                   <button 
                     onClick={handleEnhance} 
                     disabled={isEnhancing || !subject} 
@@ -786,48 +1080,11 @@ export default function App() {
               </div>
             </div>
 
-            {negPrompt && (
-              <div className="glass-card p-6 rounded-3xl border-theme-border shadow-lg">
-                 <h3 className="text-sm font-bold text-theme-muted uppercase tracking-widest mb-4">🚫 Negative Prompt (Anti-Prompt)</h3>
-                 <div className="flex flex-wrap gap-2 mb-4">
-                   <button 
-                     onClick={() => setCustomNegPrompt(prev => prev + (prev ? ', ' : '') + 'text, watermark, signature, logo, typography, words')}
-                     className="text-[10px] bg-theme-panel border border-theme-border hover:border-theme-accent px-3 py-1 rounded-full text-theme-text transition-colors"
-                   >
-                     + Anti-Texte
-                   </button>
-                   <button 
-                     onClick={() => setCustomNegPrompt(prev => prev + (prev ? ', ' : '') + '3d, cgi, render, unreal engine, octane, plastic, smooth')}
-                     className="text-[10px] bg-theme-panel border border-theme-border hover:border-theme-accent px-3 py-1 rounded-full text-theme-text transition-colors"
-                   >
-                     + Anti-3D
-                   </button>
-                   <button 
-                     onClick={() => setCustomNegPrompt(prev => prev + (prev ? ', ' : '') + 'anime, manga, illustration, drawing, painting, cartoon')}
-                     className="text-[10px] bg-theme-panel border border-theme-border hover:border-theme-accent px-3 py-1 rounded-full text-theme-text transition-colors"
-                   >
-                     + Anti-Manga
-                   </button>
-                   <button 
-                     onClick={() => setCustomNegPrompt(prev => prev + (prev ? ', ' : '') + 'nsfw, nude, naked, pornography, hate, violence, blood, gore, indecent positions, explicit')}
-                     className="text-[10px] bg-theme-panel border border-theme-border hover:border-theme-accent px-3 py-1 rounded-full text-theme-text transition-colors"
-                   >
-                     + SFW (Filtre Strict)
-                   </button>
-                 </div>
-                 <textarea 
-                    value={customNegPrompt}
-                    onChange={(e) => setCustomNegPrompt(e.target.value)}
-                    rows={3}
-                    className="w-full p-4 rounded-xl resize-none text-xs font-mono text-theme-text bg-theme-bg border border-theme-border"
-                 />
-              </div>
-            )}
-
             {isGeneratingImage && (
-              <div className="glass-card p-6 rounded-3xl border-theme-border shadow-lg flex flex-col items-center justify-center min-h-[300px]">
-                <Loader2 className="w-8 h-8 animate-spin text-theme-accent mb-4" />
-                <p className="text-theme-muted text-sm animate-pulse text-center">
+              <div className="glass-card p-6 rounded-3xl border-theme-border shadow-lg flex flex-col items-center justify-center min-h-[300px] relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-theme-accent/20 to-transparent animate-scan pointer-events-none" />
+                <Loader2 className="w-8 h-8 animate-spin text-theme-accent mb-4 z-10" />
+                <p className="text-theme-muted text-sm animate-pulse text-center z-10">
                   Freyad-Craft is painting your vision...<br/>
                   <span className="text-xs opacity-70">Freyad-Craft peint votre vision...</span>
                 </p>
@@ -876,15 +1133,39 @@ export default function App() {
             {/* GALLERY */}
             {gallery.length > 0 && (
               <div className="glass-card p-6 rounded-3xl border-theme-border shadow-lg">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-sm font-bold text-theme-accent uppercase tracking-widest">Visual Gallery</h3>
-                  <button onClick={() => setGallery([])} className="text-xs text-theme-muted hover:text-red-500 transition-colors flex items-center gap-1">
-                    <Trash2 className="w-3 h-3" /> Clear
-                  </button>
+                <div className="flex flex-col gap-4 mb-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-bold text-theme-accent uppercase tracking-widest">Visual Gallery</h3>
+                    <button onClick={() => setGallery([])} className="text-xs text-theme-muted hover:text-red-500 transition-colors flex items-center gap-1">
+                      <Trash2 className="w-3 h-3" /> Clear
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <select 
+                      value={galleryFilter}
+                      onChange={(e) => setGalleryFilter(e.target.value)}
+                      className="bg-theme-panel border border-theme-border rounded-lg text-xs p-2 text-theme-text focus:border-theme-accent outline-none"
+                    >
+                      <option value="All">All Categories</option>
+                      {Array.from(new Set(gallery.map(g => g.category || 'Unknown'))).map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <select 
+                      value={gallerySort}
+                      onChange={(e) => setGallerySort(e.target.value as any)}
+                      className="bg-theme-panel border border-theme-border rounded-lg text-xs p-2 text-theme-text focus:border-theme-accent outline-none"
+                    >
+                      <option value="date_desc">Newest First</option>
+                      <option value="date_asc">Oldest First</option>
+                      <option value="prompt">Prompt (A-Z)</option>
+                      <option value="category">Category (A-Z)</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2">
-                  {gallery.map((item, i) => (
-                    <div key={i} className="bg-theme-panel rounded-xl overflow-hidden border border-theme-border group">
+                  {filteredAndSortedGallery.map((item) => (
+                    <div key={item.image} className="bg-theme-panel rounded-xl overflow-hidden border border-theme-border group">
                       <div className="relative cursor-pointer" onClick={() => setZoomedImage(item.image)}>
                         <img src={item.image} alt="Generated" className="w-full h-auto object-cover aspect-square" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -892,17 +1173,46 @@ export default function App() {
                         </div>
                       </div>
                       <div className="p-3">
-                        <p className="text-[10px] text-theme-muted mb-2">{item.time}</p>
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="text-[10px] text-theme-muted">{item.time}</p>
+                          <span className="text-[10px] bg-theme-bg px-2 py-0.5 rounded-full text-theme-accent border border-theme-border">{item.category || 'Unknown'}</span>
+                        </div>
                         <p className="text-xs text-theme-text line-clamp-3 font-mono" title={item.prompt}>{item.prompt}</p>
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText(item.prompt);
-                            triggerToast();
-                          }}
-                          className="mt-2 w-full py-1 bg-theme-bg border border-theme-border rounded text-xs text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors"
-                        >
-                          Copy Prompt
-                        </button>
+                        <div className="mt-3 flex gap-2">
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(item.prompt);
+                              triggerToast();
+                            }}
+                            className="flex-1 py-1 bg-theme-bg border border-theme-border rounded text-xs text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors flex items-center justify-center gap-1"
+                            title="Copy Prompt"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = item.image;
+                              link.download = `generated-${item.time.replace(/:/g, '-')}.png`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="flex-1 py-1 bg-theme-bg border border-theme-border rounded text-xs text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors flex items-center justify-center gap-1"
+                            title="Download Image"
+                          >
+                            <Download className="w-3 h-3" />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setGallery(prev => prev.filter(g => g.image !== item.image));
+                            }}
+                            className="flex-1 py-1 bg-theme-bg border border-theme-border rounded text-xs text-red-400 hover:text-red-500 hover:border-red-500 transition-colors flex items-center justify-center gap-1"
+                            title="Delete Image"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -937,20 +1247,8 @@ export default function App() {
 
         {/* FOOTER */}
         <footer className="mt-16 pt-8 border-t border-theme-border flex flex-col items-center justify-center gap-4 pb-8">
-          <div className="flex items-center gap-3 text-theme-accent">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
-              {/* Dome */}
-              <path d="M4 15v-3a8 8 0 0 1 16 0v3" />
-              {/* Brim */}
-              <path d="M2 15h20" />
-              {/* Horns */}
-              <path d="M5 12c-2-3-3-7-3-7s3 1 4.5 4" />
-              <path d="M19 12c2-3 3-7 3-7s-3 1-4.5 4" />
-              {/* Center detail */}
-              <path d="M12 15V7" />
-              {/* Nose guard */}
-              <path d="M12 15v4" />
-            </svg>
+          <div className="flex flex-col items-center gap-3 text-theme-accent">
+            <img src="/logo.png" alt="Tho0r-Craft Logo" className="h-24 object-contain drop-shadow-[0_0_15px_rgba(255,215,0,0.2)]" onError={(e) => e.currentTarget.style.display = 'none'} />
             <span className="font-black tracking-widest uppercase text-xl">KamaOne</span>
           </div>
           <div className="text-center text-xs space-y-2 text-theme-muted opacity-70">
@@ -1118,6 +1416,24 @@ export default function App() {
             <div className="space-y-4 text-sm text-theme-text leading-relaxed">
               <p><strong>Objet :</strong> Les présentes CGU définissent les conditions d'utilisation de l'application Tho0r-Craft.</p>
               <p><strong>Responsabilité :</strong> L'utilisateur est seul responsable des prompts générés et des images créées via l'application. KamaOne décline toute responsabilité quant à l'utilisation faite des contenus générés.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE PRESET MODAL */}
+      {presetToDelete && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setPresetToDelete(null)}>
+          <div className="bg-theme-bg border border-theme-border rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-theme-text mb-4">Supprimer le preset ?</h3>
+            <p className="text-theme-muted text-sm mb-8">Voulez-vous vraiment supprimer le preset "{presetToDelete}" ? Cette action est irréversible.</p>
+            <div className="flex gap-4 justify-center">
+              <button onClick={() => setPresetToDelete(null)} className="px-6 py-2 rounded-full border border-theme-border text-theme-muted hover:text-theme-text transition-colors">
+                Annuler
+              </button>
+              <button onClick={executeDeletePreset} className="px-6 py-2 rounded-full bg-red-500/20 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white transition-colors">
+                Supprimer
+              </button>
             </div>
           </div>
         </div>
