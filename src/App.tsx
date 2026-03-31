@@ -1,10 +1,35 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders } from 'lucide-react';
+import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
+import ReactCrop, { type Crop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 import { config, angles, stylesData, stylesValue, lightsData, lightsValue, bgsData, bgsValue } from './data';
 import { LiveAssistant } from './components/LiveAssistant';
 import { ThemeSettings } from './components/ThemeSettings';
 import { Chatbot } from './components/Chatbot';
+
+interface AppState {
+  category: string;
+  layout: string;
+  subject: string;
+  style: string;
+  lighting: string;
+  background: string;
+  sliderS: string;
+  sliderC: string;
+  sliderW: string;
+  selectedAngles: string[];
+  attributes: Record<string, string>;
+  lens: string;
+  aspect: string;
+  img2img: boolean;
+  referenceImage: string | null;
+  img2imgStrength: number;
+  customNegPrompt: string;
+  seed: number | null;
+  temperature: number;
+  generatedPrompt: string;
+}
 
 interface Preset {
   cat: string;
@@ -57,15 +82,27 @@ export default function App() {
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [img2imgStrength, setImg2imgStrength] = useState<number>(50);
   const [customNegPrompt, setCustomNegPrompt] = useState('worst quality, low quality, normal quality, watermark, signature, text, blurry, deformed, ugly, bad anatomy, extra fingers, mutated hands, cropped, bad proportions, disfigured face, asymmetric eyes');
+  const [seed, setSeed] = useState<number | null>(null);
+  const [temperature, setTemperature] = useState<number>(0.5);
 
   const [generatedPrompt, setGeneratedPrompt] = useState('');
   
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isUpscaling, setIsUpscaling] = useState(false);
   
   const [isRotationEnabled, setIsRotationEnabled] = useState(false);
   const [rotationImages, setRotationImages] = useState<string[]>([]);
   const [rotationIndex, setRotationIndex] = useState(0);
+
+  // Image Editing States
+  const [isEditingImage, setIsEditingImage] = useState(false);
+  const [editBrightness, setEditBrightness] = useState(100);
+  const [editContrast, setEditContrast] = useState(100);
+  const [editRotation, setEditRotation] = useState(0);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<Crop>();
+  const imgRef = useRef<HTMLImageElement>(null);
   
   const [presetName, setPresetName] = useState('');
   const [presets, setPresets] = useState<Record<string, Preset>>({});
@@ -90,6 +127,80 @@ export default function App() {
   const [gallerySort, setGallerySort] = useState<'date_desc' | 'date_asc' | 'prompt' | 'category'>('date_desc');
   const [galleryFilter, setGalleryFilter] = useState<string>('All');
 
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const historyStackRef = useRef<AppState[]>([]);
+  const historyIndexRef = useRef<number>(-1);
+  const isRestoringRef = useRef(false);
+
+  const currentState: AppState = {
+    category, layout, subject, style, lighting, background, sliderS, sliderC, sliderW, selectedAngles, attributes, lens, aspect, img2img, referenceImage, img2imgStrength, customNegPrompt, seed, temperature, generatedPrompt
+  };
+
+  useEffect(() => {
+    if (isRestoringRef.current) {
+      isRestoringRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      const lastState = historyStackRef.current[historyIndexRef.current];
+      if (JSON.stringify(lastState) !== JSON.stringify(currentState)) {
+        const newHistory = historyStackRef.current.slice(0, historyIndexRef.current + 1);
+        newHistory.push(currentState);
+        historyStackRef.current = newHistory;
+        historyIndexRef.current = newHistory.length - 1;
+        setCanUndo(historyIndexRef.current > 0);
+        setCanRedo(historyIndexRef.current < historyStackRef.current.length - 1);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [category, layout, subject, style, lighting, background, sliderS, sliderC, sliderW, selectedAngles, attributes, lens, aspect, img2img, referenceImage, img2imgStrength, customNegPrompt, seed, temperature, generatedPrompt]);
+
+  const restoreState = (state: AppState) => {
+    setCategory(state.category);
+    setLayout(state.layout);
+    setSubject(state.subject);
+    setStyle(state.style);
+    setLighting(state.lighting);
+    setBackground(state.background);
+    setSliderS(state.sliderS);
+    setSliderC(state.sliderC);
+    setSliderW(state.sliderW);
+    setSelectedAngles(state.selectedAngles);
+    setAttributes(state.attributes);
+    setLens(state.lens);
+    setAspect(state.aspect);
+    setImg2img(state.img2img);
+    setReferenceImage(state.referenceImage);
+    setImg2imgStrength(state.img2imgStrength);
+    setCustomNegPrompt(state.customNegPrompt);
+    setSeed(state.seed);
+    setTemperature(state.temperature);
+    setGeneratedPrompt(state.generatedPrompt);
+  };
+
+  const handleUndo = () => {
+    if (historyIndexRef.current > 0) {
+      isRestoringRef.current = true;
+      historyIndexRef.current -= 1;
+      const prevState = historyStackRef.current[historyIndexRef.current];
+      restoreState(prevState);
+      setCanUndo(historyIndexRef.current > 0);
+      setCanRedo(historyIndexRef.current < historyStackRef.current.length - 1);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndexRef.current < historyStackRef.current.length - 1) {
+      isRestoringRef.current = true;
+      historyIndexRef.current += 1;
+      const nextState = historyStackRef.current[historyIndexRef.current];
+      restoreState(nextState);
+      setCanUndo(historyIndexRef.current > 0);
+      setCanRedo(historyIndexRef.current < historyStackRef.current.length - 1);
+    }
+  };
+
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -101,10 +212,18 @@ export default function App() {
         const index = parseInt(e.key) - 1;
         if (cats[index]) setCategory(cats[index]);
       }
+      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      if (e.ctrlKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        handleRedo();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [generatedPrompt]);
+  }, [generatedPrompt, canUndo, canRedo]);
 
   // Narrator Logic
   useEffect(() => {
@@ -303,14 +422,18 @@ export default function App() {
       const getParts = (promptText: string) => {
         const parts: any[] = [];
         if (img2img && referenceImage) {
-          const mimeType = referenceImage.match(/data:(.*?);/)?.[1] || 'image/png';
-          const base64Data = referenceImage.split(',')[1];
-          parts.push({
-            inlineData: {
-              data: base64Data,
-              mimeType: mimeType
-            }
-          });
+          if (referenceImage.startsWith('data:')) {
+            const mimeType = referenceImage.match(/data:(.*?);/)?.[1] || 'image/png';
+            const base64Data = referenceImage.split(',')[1];
+            parts.push({
+              inlineData: {
+                data: base64Data,
+                mimeType: mimeType
+              }
+            });
+          } else {
+            throw new Error("Reference image must be a valid uploaded image or gallery image.");
+          }
         }
         parts.push({ text: promptText });
         return parts;
@@ -325,6 +448,8 @@ export default function App() {
               parts: getParts(`${cleanPrompt}, ${angle}`)
             },
             config: {
+              temperature: temperature,
+              ...(seed !== null && { seed: seed }),
               imageConfig: {
                 aspectRatio: aspect === '--ar 16:9' ? '16:9' : aspect === '--ar 9:16' ? '9:16' : aspect === '--ar 4:3' ? '4:3' : aspect === '--ar 3:4' ? '3:4' : '1:1'
               }
@@ -367,6 +492,8 @@ export default function App() {
             parts: getParts(cleanPrompt)
           },
           config: {
+            temperature: temperature,
+            ...(seed !== null && { seed: seed }),
             imageConfig: {
               aspectRatio: aspect === '--ar 16:9' ? '16:9' : aspect === '--ar 9:16' ? '9:16' : aspect === '--ar 4:3' ? '4:3' : aspect === '--ar 3:4' ? '3:4' : '1:1'
             }
@@ -447,9 +574,9 @@ export default function App() {
     if (!file) return;
 
     setIsAnalyzing(true);
-    try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
         const base64Data = (reader.result as string).split(',')[1];
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         
@@ -482,13 +609,84 @@ export default function App() {
             console.error("Failed to parse JSON", e);
           }
         }
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error("Image analysis error:", error);
-    } finally {
-      setIsAnalyzing(false);
+      } catch (error) {
+        console.error("Image analysis error:", error);
+      } finally {
+        setIsAnalyzing(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const applyEdits = () => {
+    const imgToEdit = rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage;
+    if (!imgToEdit || !imgRef.current) return;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const image = imgRef.current;
+    
+    // Calculate crop dimensions
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    
+    let cropX = 0;
+    let cropY = 0;
+    let cropWidth = image.naturalWidth;
+    let cropHeight = image.naturalHeight;
+
+    if (completedCrop && completedCrop.width && completedCrop.height) {
+      cropX = completedCrop.x * scaleX;
+      cropY = completedCrop.y * scaleY;
+      cropWidth = completedCrop.width * scaleX;
+      cropHeight = completedCrop.height * scaleY;
     }
+
+    // Set canvas size based on rotation
+    if (editRotation === 90 || editRotation === 270) {
+      canvas.width = cropHeight;
+      canvas.height = cropWidth;
+    } else {
+      canvas.width = cropWidth;
+      canvas.height = cropHeight;
+    }
+
+    // Apply transformations
+    ctx.filter = `brightness(${editBrightness}%) contrast(${editContrast}%)`;
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((editRotation * Math.PI) / 180);
+    
+    // Draw image
+    ctx.drawImage(
+      image,
+      cropX,
+      cropY,
+      cropWidth,
+      cropHeight,
+      -cropWidth / 2,
+      -cropHeight / 2,
+      cropWidth,
+      cropHeight
+    );
+
+    const newImageData = canvas.toDataURL('image/png');
+    
+    if (rotationImages.length > 0) {
+      const newRotations = [...rotationImages];
+      newRotations[rotationIndex] = newImageData;
+      setRotationImages(newRotations);
+    } else {
+      setGeneratedImage(newImageData);
+    }
+    
+    setIsEditingImage(false);
+    setEditBrightness(100);
+    setEditContrast(100);
+    setEditRotation(0);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
   };
 
   const handleDownloadImage = () => {
@@ -500,6 +698,77 @@ export default function App() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleUpscale = async () => {
+    const imgToUpscale = rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage;
+    if (!imgToUpscale) return;
+    
+    setIsUpscaling(true);
+    try {
+      // @ts-ignore
+      if (typeof window !== 'undefined' && window.aistudio && window.aistudio.hasSelectedApiKey) {
+        // @ts-ignore
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+          // @ts-ignore
+          await window.aistudio.openSelectKey();
+        }
+      }
+      
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const base64Data = imgToUpscale.split(',')[1];
+      const mimeType = imgToUpscale.match(/data:(.*?);/)?.[1] || 'image/png';
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-image-preview',
+        contents: {
+          parts: [
+            { inlineData: { data: base64Data, mimeType } },
+            { text: generatedPrompt + ", upscale, enhance details, 2k resolution, high quality, masterpiece" }
+          ]
+        },
+        config: {
+          imageConfig: {
+            imageSize: "2K",
+            aspectRatio: aspect === '--ar 16:9' ? '16:9' : aspect === '--ar 9:16' ? '9:16' : aspect === '--ar 4:3' ? '4:3' : aspect === '--ar 3:4' ? '3:4' : '1:1'
+          }
+        }
+      });
+      
+      const candidate = response.candidates?.[0];
+      const imagePart = candidate?.content?.parts?.find(p => p.inlineData || (p as any).inline_data);
+      const inlineData = imagePart?.inlineData || (imagePart as any)?.inline_data;
+      const generatedImages = (response as any).generatedImages || (response as any).generated_images;
+      
+      let newImgData = null;
+      if (inlineData?.data) {
+        newImgData = `data:image/png;base64,${inlineData.data}`;
+      } else if (generatedImages && generatedImages.length > 0) {
+        const imgBytes = generatedImages[0].image?.imageBytes || generatedImages[0].image?.image_bytes;
+        if (imgBytes) {
+          newImgData = `data:image/png;base64,${imgBytes}`;
+        }
+      }
+      
+      if (newImgData) {
+        if (rotationImages.length > 0) {
+          const newRotations = [...rotationImages];
+          newRotations[rotationIndex] = newImgData;
+          setRotationImages(newRotations);
+        } else {
+          setGeneratedImage(newImgData);
+        }
+        setGallery(prev => [{ image: newImgData, prompt: generatedPrompt + " (Upscaled 2K)", time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+      } else {
+        throw new Error("No image data returned from upscaler.");
+      }
+    } catch (error: any) {
+      console.error("Upscale error:", error);
+      alert(`Error upscaling image: ${error.message}`);
+    } finally {
+      setIsUpscaling(false);
+    }
   };
 
   const triggerToast = () => {
@@ -595,6 +864,22 @@ export default function App() {
           <p className="text-theme-muted font-medium tracking-wide uppercase italic">Director Console • Ultimate Edition</p>
           
           <div className="absolute top-0 right-0 md:top-2 md:right-4 flex items-center gap-2">
+            <button 
+              onClick={handleUndo} 
+              disabled={!canUndo}
+              className="text-xs font-bold text-theme-accent border border-theme-border hover:bg-theme-accent/10 px-3 py-2 rounded-full transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleRedo} 
+              disabled={!canRedo}
+              className="text-xs font-bold text-theme-accent border border-theme-border hover:bg-theme-accent/10 px-3 py-2 rounded-full transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo className="w-4 h-4" />
+            </button>
             <button 
               onClick={handleExport} 
               className="text-xs font-bold text-theme-accent border border-theme-border hover:bg-theme-accent/10 px-4 py-2 rounded-full transition-all flex items-center gap-2"
@@ -905,13 +1190,43 @@ export default function App() {
                     </div>
 
                     {img2img && (
-                      <div className="mt-4 p-4 bg-theme-bg/50 rounded-xl border border-theme-border/50 space-y-4">
+                      <div 
+                        className="mt-4 p-4 bg-theme-bg/50 rounded-xl border border-theme-border/50 space-y-4"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const imageUrl = e.dataTransfer.getData('text/plain');
+                          if (imageUrl) {
+                            setReferenceImage(imageUrl);
+                          } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                            const file = e.dataTransfer.files[0];
+                            if (file.type.startsWith('image/')) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setReferenceImage(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }
+                        }}
+                      >
                         <div className="flex flex-col gap-2">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-theme-accent flex items-center gap-2">
-                            <ImageIcon className="w-4 h-4" /> Reference Image
-                          </label>
+                          <div className="flex items-center gap-2">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-theme-accent flex items-center gap-2">
+                              <ImageIcon className="w-4 h-4" /> Reference Image
+                            </label>
+                            <div className="group relative">
+                              <Info className="w-3 h-3 text-theme-muted hover:text-theme-accent cursor-help transition-colors" />
+                              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-3 bg-theme-panel border border-theme-border rounded-xl shadow-2xl text-[10px] text-theme-text z-50">
+                                <p className="font-bold text-theme-accent mb-1">How Denoising Strength Works:</p>
+                                <ul className="space-y-1 text-theme-muted">
+                                  <li><strong className="text-theme-text">0-40% (Strict):</strong> High adherence to the reference image. The AI will preserve the original structure and colors, acting more like a filter.</li>
+                                  <li><strong className="text-theme-text">41-80% (Moderate):</strong> Balances the reference image with your text prompt and style settings. Good for style transfers.</li>
+                                  <li><strong className="text-theme-text">81-100% (Loose):</strong> The reference image is used only as loose inspiration. The AI has significant creative freedom to alter the visual style and structure.</li>
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
                           <p className="text-[10px] text-theme-muted leading-tight">
-                            Upload an image to use as a structural and visual reference.
+                            Upload an image or drag and drop from the gallery. Use the <strong>Denoising Strength</strong> slider below to control how strictly the AI adheres to this reference versus your text prompt.
                           </p>
                           <div className="flex items-center gap-4">
                             <label className="cursor-pointer bg-theme-accent/10 hover:bg-theme-accent/20 text-theme-accent px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border border-theme-accent/20">
@@ -940,15 +1255,15 @@ export default function App() {
                             )}
                           </div>
                           {referenceImage && (
-                            <div className="mt-2 relative w-24 h-24 rounded-lg overflow-hidden border border-theme-border">
-                              <img src={referenceImage} alt="Reference" className="w-full h-full object-cover" />
+                            <div className="mt-2 relative w-32 h-32 rounded-lg overflow-hidden border border-theme-border">
+                              <img src={referenceImage} alt="Reference Preview" className="w-full h-full object-cover" />
                             </div>
                           )}
                         </div>
 
                         <div className="pt-2">
                           <div className="flex justify-between mb-1">
-                            <span className="text-[10px] uppercase text-theme-muted flex items-center gap-1">Influence Strength</span>
+                            <span className="text-[10px] uppercase text-theme-muted flex items-center gap-1">Denoising Strength</span>
                             <span className="text-[10px] font-mono text-theme-accent">{img2imgStrength}%</span>
                           </div>
                           <input 
@@ -1131,7 +1446,7 @@ export default function App() {
           {/* RIGHT: OUTPUT & HISTORY */}
           <div className={`${isFocusMode ? 'col-span-1 lg:col-span-12' : 'lg:col-span-5'} flex flex-col gap-6 transition-all duration-500`}>
             <div className="glass-card p-8 rounded-3xl border-theme-border shadow-lg sticky top-8">
-              <div className="flex justify-between items-center mb-8">
+              <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-theme-accent tracking-tighter italic">DIRECTOR'S OUTPUT</h2>
                 <div className="flex gap-2">
                   <button 
@@ -1157,6 +1472,40 @@ export default function App() {
                   </button>
                 </div>
               </div>
+
+              <div className="flex flex-col gap-4 mb-6 bg-theme-panel p-4 rounded-xl border border-theme-border">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-theme-muted uppercase tracking-widest">Model Parameters</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] uppercase text-theme-muted mb-1">Seed (Optional)</label>
+                    <input 
+                      type="number" 
+                      value={seed === null ? '' : seed}
+                      onChange={(e) => setSeed(e.target.value ? Number(e.target.value) : null)}
+                      placeholder="Random"
+                      className="w-full p-2 rounded-lg text-xs bg-theme-bg border border-theme-border text-theme-text focus:border-theme-accent outline-none"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <label className="block text-[10px] uppercase text-theme-muted">Temperature</label>
+                      <span className="text-[10px] font-mono text-theme-accent">{temperature.toFixed(2)}</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="1" 
+                      step="0.05"
+                      value={temperature}
+                      onChange={(e) => setTemperature(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="output-container p-6 rounded-2xl text-theme-text text-sm overflow-y-auto whitespace-pre-wrap min-h-[400px] max-h-[600px] leading-relaxed font-mono bg-theme-bg">
                 {generatedPrompt}
               </div>
@@ -1177,36 +1526,101 @@ export default function App() {
               <div className="glass-card p-6 rounded-3xl border-theme-border shadow-lg">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-sm font-bold text-theme-muted uppercase tracking-widest">✨ Generated Vision</h3>
-                  <button onClick={handleDownloadImage} className="text-theme-accent hover:text-theme-text transition-colors flex items-center gap-1 text-xs font-bold">
-                    <Download className="w-4 h-4" /> DOWNLOAD
-                  </button>
-                </div>
-                <div className="relative group cursor-pointer overflow-hidden rounded-xl transition-all duration-500 hover:shadow-[0_0_30px_var(--accent)]" onClick={() => setZoomedImage(rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage)}>
-                  <img 
-                    src={rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage} 
-                    alt="Generated Vision" 
-                    className="w-full h-auto rounded-xl shadow-md transition-transform duration-500 group-hover:scale-105" 
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl flex items-center justify-center">
-                    <ZoomIn className="w-12 h-12 text-white" />
+                  <div className="flex gap-3">
+                    {!isEditingImage ? (
+                      <>
+                        <button onClick={() => setIsEditingImage(true)} className="text-theme-accent hover:text-theme-text transition-colors flex items-center gap-1 text-xs font-bold">
+                          <Edit3 className="w-4 h-4" /> EDIT
+                        </button>
+                        <button onClick={handleUpscale} disabled={isUpscaling} className="text-theme-accent hover:text-theme-text transition-colors flex items-center gap-1 text-xs font-bold disabled:opacity-50">
+                          {isUpscaling ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUpCircle className="w-4 h-4" />} UPSCALE (2K)
+                        </button>
+                        <button onClick={handleDownloadImage} className="text-theme-accent hover:text-theme-text transition-colors flex items-center gap-1 text-xs font-bold">
+                          <Download className="w-4 h-4" /> DOWNLOAD
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => setIsEditingImage(false)} className="text-theme-muted hover:text-theme-text transition-colors flex items-center gap-1 text-xs font-bold">
+                          <X className="w-4 h-4" /> CANCEL
+                        </button>
+                        <button onClick={applyEdits} className="text-green-500 hover:text-green-400 transition-colors flex items-center gap-1 text-xs font-bold">
+                          <Copy className="w-4 h-4" /> APPLY EDITS
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
-                {rotationImages.length > 0 && (
-                  <div className="mt-6 bg-theme-panel p-4 rounded-xl border border-theme-border">
-                    <div className="flex justify-between text-[10px] font-bold uppercase text-theme-muted mb-2">
-                      <span>Face</span>
-                      <span>Profil D</span>
-                      <span>Dos</span>
-                      <span>Profil G</span>
+                {!isEditingImage ? (
+                  <>
+                    <div className="relative group cursor-pointer overflow-hidden rounded-xl transition-all duration-500 hover:shadow-[0_0_30px_var(--accent)]" onClick={() => setZoomedImage(rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage)}>
+                      <img 
+                        src={rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage} 
+                        alt="Generated Vision" 
+                        className="w-full h-auto rounded-xl shadow-md transition-transform duration-500 group-hover:scale-105" 
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl flex items-center justify-center">
+                        <ZoomIn className="w-12 h-12 text-white" />
+                      </div>
                     </div>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max={rotationImages.length - 1} 
-                      value={rotationIndex} 
-                      onChange={(e) => setRotationIndex(parseInt(e.target.value))}
-                      className="w-full accent-theme-accent"
-                    />
+                    {rotationImages.length > 0 && (
+                      <div className="mt-6 bg-theme-panel p-4 rounded-xl border border-theme-border">
+                        <div className="flex justify-between text-[10px] font-bold uppercase text-theme-muted mb-2">
+                          <span>Face</span>
+                          <span>Profil D</span>
+                          <span>Dos</span>
+                          <span>Profil G</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max={rotationImages.length - 1} 
+                          value={rotationIndex} 
+                          onChange={(e) => setRotationIndex(parseInt(e.target.value))}
+                          className="w-full accent-theme-accent"
+                        />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <div className="bg-theme-bg p-4 rounded-xl border border-theme-border flex justify-center overflow-hidden">
+                      <ReactCrop crop={crop} onChange={c => setCrop(c)} onComplete={c => setCompletedCrop(c)}>
+                        <img 
+                          ref={imgRef}
+                          src={rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage} 
+                          alt="Edit Vision" 
+                          className="max-h-[500px] w-auto object-contain"
+                          style={{
+                            filter: `brightness(${editBrightness}%) contrast(${editContrast}%)`,
+                            transform: `rotate(${editRotation}deg)`
+                          }}
+                        />
+                      </ReactCrop>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-theme-panel p-4 rounded-xl border border-theme-border">
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-[10px] uppercase text-theme-muted flex items-center gap-1"><Sun className="w-3 h-3"/> Brightness</label>
+                          <span className="text-[10px] font-mono text-theme-accent">{editBrightness}%</span>
+                        </div>
+                        <input type="range" min="0" max="200" value={editBrightness} onChange={(e) => setEditBrightness(Number(e.target.value))} className="w-full" />
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-[10px] uppercase text-theme-muted flex items-center gap-1"><Contrast className="w-3 h-3"/> Contrast</label>
+                          <span className="text-[10px] font-mono text-theme-accent">{editContrast}%</span>
+                        </div>
+                        <input type="range" min="0" max="200" value={editContrast} onChange={(e) => setEditContrast(Number(e.target.value))} className="w-full" />
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-[10px] uppercase text-theme-muted flex items-center gap-1"><RotateCw className="w-3 h-3"/> Rotation</label>
+                          <span className="text-[10px] font-mono text-theme-accent">{editRotation}°</span>
+                        </div>
+                        <input type="range" min="0" max="360" step="90" value={editRotation} onChange={(e) => setEditRotation(Number(e.target.value))} className="w-full" />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1249,8 +1663,14 @@ export default function App() {
                   {filteredAndSortedGallery.map((item) => (
                     <div key={item.image} className="bg-theme-panel rounded-xl overflow-hidden border border-theme-border group transition-all duration-500 hover:shadow-[0_0_20px_var(--accent)] hover:border-theme-accent">
                       <div className="relative cursor-pointer overflow-hidden" onClick={() => setZoomedImage(item.image)}>
-                        <img src={item.image} alt="Generated" className="w-full h-auto object-cover aspect-square transition-transform duration-500 group-hover:scale-110" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center">
+                        <img 
+                          src={item.image} 
+                          alt="Generated" 
+                          className="w-full h-auto object-cover aspect-square transition-transform duration-500 group-hover:scale-110"
+                          draggable
+                          onDragStart={(e) => e.dataTransfer.setData('text/plain', item.image)}
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center pointer-events-none">
                           <ZoomIn className="w-8 h-8 text-white" />
                         </div>
                       </div>

@@ -74,6 +74,7 @@ export const config: Record<string, any> = {
     layouts: { F0: "✦ Vue Unique", F1: "Blueprint Tech" },
     attrs: [
       { id: "car_color", label: "Finition", type: "select", icon: PaintBucket, options: ["Noir Mat", "Chrome", "Candy Red", "Néon Bleu", "British Green", "Caméléon", "Carbone Forgé", "Or 24k", "Rouille (Mad Max)"] },
+      { id: "car_material", label: "Material", type: "select", icon: PaintBucket, options: ["Chrome", "Matte Black", "Carbon Fiber", "Brushed Aluminum", "Painted Steel"] },
       { id: "car_state", label: "État", type: "select", icon: Wrench, options: ["Neuf", "Boueux", "Accidenté", "Abandonné", "Custom"] }
     ] 
   },
@@ -100,7 +101,7 @@ export const config: Record<string, any> = {
   I: {
     label: "⚡ Mythological Being",
     role: "Expert Mythological Illustrator and Lore Master",
-    layouts: { I0: "Heroic Portrait", I1: "Divine Manifestation", I2: "Epic Battle Scene", I3: "Statue/Idol" },
+    layouts: { I0: "Centered Full Body", I1: "Bust Shot with Dramatic Lighting", I2: "Action Pose with Background Elements", I3: "Statue/Idol" },
     attrs: [
       { id: "myth_origin", label: "Pantheon", type: "select", icon: Globe, options: ["Greek", "Norse", "Egyptian", "Celtic", "Japanese", "Aztec", "Mesopotamian"] },
       { id: "myth_nature", label: "Nature", type: "select", icon: Sparkles, options: ["Deity", "Demigod", "Spirit", "Demon", "Titan", "Nymph"] },
@@ -162,9 +163,18 @@ export const config: Record<string, any> = {
     role: "Lead Brand Designer and Corporate Identity Specialist",
     layouts: { P0: "Centered Logo on Solid Background", P1: "Logo with Typography/Wordmark", P2: "App Icon Design", P3: "Brand Identity Mockup (Business Cards, Letterhead)" },
     attrs: [
-      { id: "logo_style", label: "Style", type: "select", icon: PenTool, options: ["Minimalist", "Vintage / Retro", "Mascot / Character", "Abstract / Geometric", "Hand-drawn / Organic", "Corporate / Professional", "3D / Embossed", "Cyberpunk / Neon"] },
+      { id: "logo_style", label: "Style", type: "select", icon: PenTool, options: ["Minimalist", "Vintage / Retro", "Mascot / Character", "Abstract / Geometric", "Hand-drawn / Organic", "Corporate / Professional", "3D / Embossed", "Cyberpunk / Neon", "Neon"] },
       { id: "logo_color", label: "Color Palette", type: "select", icon: Palette, options: ["Monochrome", "Black and White", "Pastel", "Neon / Vibrant", "Earthy / Natural", "Gradient", "Gold / Luxury", "Primary Colors"] },
       { id: "logo_background", label: "Background", type: "select", icon: Layout, options: ["Transparent / White", "Dark / Black", "Textured Paper", "Gradient Backdrop", "Contextual Mockup"] }
+    ]
+  },
+  V: {
+    label: "🎥 Video",
+    role: "AI Video Director",
+    layouts: { V0: "Short Clip", V1: "Explainer Video Scene", V2: "Animated Logo Intro" },
+    attrs: [
+      { id: "video_style", label: "Video Style", type: "select", icon: Clapperboard, options: ["Cinematic", "Animated", "Abstract", "Photorealistic", "Cartoon", "Stop Motion"] },
+      { id: "video_duration", label: "Duration", type: "select", icon: Clock, options: ["Short (5s)", "Medium (15s)", "Long (30s)"] }
     ]
   }
 };
