@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast } from 'lucide-react';
+import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import ReactCrop, { type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -123,9 +123,11 @@ export default function App() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [gallery, setGallery] = useState<{image: string, prompt: string, time: string, category: string, timestamp: number}[]>([]);
+  const [gallery, setGallery] = useState<{image: string, prompt: string, time: string, category: string, timestamp: number, tags?: string[]}[]>([]);
   const [gallerySort, setGallerySort] = useState<'date_desc' | 'date_asc' | 'prompt' | 'category'>('date_desc');
   const [galleryFilter, setGalleryFilter] = useState<string>('All');
+  const [galleryTagFilter, setGalleryTagFilter] = useState<string>('All');
+  const [tagInput, setTagInput] = useState<Record<string, string>>({});
 
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -232,7 +234,7 @@ export default function App() {
       return;
     }
     
-    const msg = new SpeechSynthesisUtterance("Bonjour, je suis Hildegarde, votre narratrice. Bienvenue dans Tho0r-Craft. / Hello, I am Hildegarde, your narrator. Welcome to Tho0r-Craft.");
+    const msg = new SpeechSynthesisUtterance("Bonjour, je suis Hildegarde, votre narratrice. Bienvenue dans Tho0r-Craft. Je peux maintenant vous aider avec l'Image to Image et les tags de galerie ! / Hello, I am Hildegarde, your narrator. Welcome to Tho0r-Craft. I can now help you with Image to Image and gallery tags!");
     msg.pitch = 1.2;
     msg.rate = 0.9;
     window.speechSynthesis.speak(msg);
@@ -326,8 +328,6 @@ export default function App() {
       } else {
         prompt += `**[LOOSE REFERENCE]** Use the image as a loose inspiration. Feel free to change colors, shapes, and composition significantly. Strength: ${img2imgStrength}%\n`;
       }
-    } else if (img2img) {
-      prompt += `**[CRITICAL REFERENCE]** Strictly match image features...\n`;
     }
     
     prompt += `**[Subject]** ${subj}\n`;
@@ -396,6 +396,11 @@ export default function App() {
   };
 
   const handleGenerateImage = async () => {
+    if (img2img && !referenceImage) {
+      alert("Veuillez uploader une image de référence pour utiliser la fonction Img2Img.");
+      return;
+    }
+
     setIsGeneratingImage(true);
     setGeneratedImage(null);
     setRotationImages([]);
@@ -840,8 +845,32 @@ export default function App() {
     }
   };
 
+  const handleAddTag = (image: string, tag: string | undefined) => {
+    if (!tag || !tag.trim()) return;
+    setGallery(prev => prev.map(item => {
+      if (item.image === image) {
+        const currentTags = item.tags || [];
+        if (!currentTags.includes(tag.trim())) {
+          return { ...item, tags: [...currentTags, tag.trim()] };
+        }
+      }
+      return item;
+    }));
+    setTagInput(prev => ({ ...prev, [image]: '' }));
+  };
+
+  const handleRemoveTag = (image: string, tagToRemove: string) => {
+    setGallery(prev => prev.map(item => {
+      if (item.image === image) {
+        return { ...item, tags: (item.tags || []).filter(t => t !== tagToRemove) };
+      }
+      return item;
+    }));
+  };
+
   const filteredAndSortedGallery = [...gallery]
     .filter(item => galleryFilter === 'All' || (item.category || 'Unknown') === galleryFilter)
+    .filter(item => galleryTagFilter === 'All' || (item.tags && item.tags.includes(galleryTagFilter)))
     .sort((a, b) => {
       const timeA = a.timestamp || 0;
       const timeB = b.timestamp || 0;
@@ -854,6 +883,8 @@ export default function App() {
       if (gallerySort === 'category') return catA.localeCompare(catB);
       return 0;
     });
+
+  const allTags = Array.from(new Set(gallery.flatMap(item => item.tags || []))).sort();
 
   return (
     <div className="min-h-screen p-4 md:p-8 font-sans">
@@ -1648,6 +1679,16 @@ export default function App() {
                       ))}
                     </select>
                     <select 
+                      value={galleryTagFilter}
+                      onChange={(e) => setGalleryTagFilter(e.target.value)}
+                      className="bg-theme-panel border border-theme-border rounded-lg text-xs p-2 text-theme-text focus:border-theme-accent outline-none"
+                    >
+                      <option value="All">All Tags</option>
+                      {allTags.map(tag => (
+                        <option key={tag} value={tag}>{tag}</option>
+                      ))}
+                    </select>
+                    <select 
                       value={gallerySort}
                       onChange={(e) => setGallerySort(e.target.value as any)}
                       className="bg-theme-panel border border-theme-border rounded-lg text-xs p-2 text-theme-text focus:border-theme-accent outline-none"
@@ -1680,6 +1721,38 @@ export default function App() {
                           <span className="text-[10px] bg-theme-bg px-2 py-0.5 rounded-full text-theme-accent border border-theme-border">{item.category || 'Unknown'}</span>
                         </div>
                         <p className="text-xs text-theme-text line-clamp-3 font-mono" title={item.prompt}>{item.prompt}</p>
+                        
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {(item.tags || []).map(tag => (
+                            <span key={tag} className="text-[9px] bg-theme-bg/50 border border-theme-border px-1.5 py-0.5 rounded flex items-center gap-1 text-theme-muted">
+                              <Tag className="w-2 h-2" /> {tag}
+                              <button onClick={() => handleRemoveTag(item.image, tag)} className="hover:text-red-400 ml-0.5">
+                                <X className="w-2 h-2" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <div className="mt-2 flex gap-1">
+                          <input
+                            type="text"
+                            placeholder="Add tag..."
+                            value={tagInput[item.image] || ''}
+                            onChange={(e) => setTagInput(prev => ({ ...prev, [item.image]: e.target.value }))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddTag(item.image, tagInput[item.image]);
+                              }
+                            }}
+                            className="flex-1 bg-theme-bg border border-theme-border rounded px-2 py-1 text-[10px] text-theme-text focus:border-theme-accent outline-none"
+                          />
+                          <button
+                            onClick={() => handleAddTag(item.image, tagInput[item.image])}
+                            className="bg-theme-bg border border-theme-border rounded px-2 py-1 text-[10px] text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors"
+                          >
+                            Add
+                          </button>
+                        </div>
+
                         <div className="mt-3 flex gap-2">
                           <button 
                             onClick={() => {
@@ -1846,7 +1919,25 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>5.</span> Sauvegarde & Historique
+                  <span>5.</span> Image to Image (Img2Img)
+                </h3>
+                <p className="text-theme-muted">
+                  Vous pouvez utiliser une image de référence pour guider la génération. Activez l'option <strong className="text-theme-text">Img2Img</strong>, uploadez une image, et utilisez l'outil de <strong className="text-theme-text">recadrage (Crop)</strong> pour sélectionner la zone importante. L'IA utilisera cette image comme base pour la nouvelle création.
+                </p>
+              </div>
+
+              <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
+                <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <span>6.</span> Galerie & Tags Personnalisés
+                </h3>
+                <p className="text-theme-muted">
+                  Toutes vos générations sont sauvegardées dans la <strong className="text-theme-text">Galerie</strong>. Vous pouvez désormais ajouter des <strong className="text-theme-text">Tags personnalisés</strong> à chaque image pour mieux les organiser, et utiliser les filtres pour retrouver facilement vos créations par catégorie ou par tag.
+                </p>
+              </div>
+
+              <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
+                <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <span>7.</span> Sauvegarde & Historique
                 </h3>
                 <p className="text-theme-muted">
                   Utilisez les <strong className="text-theme-text">Presets</strong> pour enregistrer vos configurations favorites (ex: "Mon Style Pixar"). 
@@ -1855,7 +1946,7 @@ export default function App() {
               </div>
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>6.</span> L'Assistante Vocale (Microphone)
+                  <span>8.</span> L'Assistante Vocale (Microphone)
                 </h3>
                 <p className="text-theme-muted">
                   En cliquant sur l'icône <strong className="text-theme-text">Microphone</strong> (en haut à droite), vous pouvez discuter directement avec <strong className="text-theme-text">Hildegarde</strong>, votre assistante vocale. Elle a une voix douce et amicale, et elle est là pour vous aider à trouver des idées, étoffer vos descriptions, ou vous suggérer des styles et des ambiances pour vos créations.
@@ -1864,7 +1955,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>7.</span> Accessibilité
+                  <span>9.</span> Accessibilité
                 </h3>
                 <p className="text-theme-muted">
                   Dans les <strong className="text-theme-text">PARAMÈTRES</strong> (en haut à droite), vous pouvez activer <strong className="text-theme-text">Hildegarde en mode Narratrice</strong> pour les personnes non-voyantes (qui lit l'interface au survol) ainsi qu'une <strong className="text-theme-text">Loupe (Zoom UI)</strong> pour les personnes malvoyantes.

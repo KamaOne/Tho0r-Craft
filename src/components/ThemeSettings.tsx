@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, Volume2, ZoomIn, Palette, Save, Trash2, Plus } from 'lucide-react';
 
 const PRESET_THEMES = [

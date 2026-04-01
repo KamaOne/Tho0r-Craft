@@ -80,12 +80,12 @@ export const config: Record<string, any> = {
   },
   L: {
     label: "✒️ Logo & Branding",
-    role: "Expert Graphic Designer & Brand Identity Specialist",
+    role: "Lead Brand Designer and Corporate Identity Specialist",
     layouts: { L0: "Vector Logo", L1: "Mascot Logo", L2: "Emblem/Badge", L3: "Minimalist Lettermark" },
     attrs: [
-      { id: "logo_style", label: "Style Graphique", type: "select", icon: PenTool, options: ["Flat Design", "3D Render", "Neon", "Vintage/Retro", "Origami", "Line Art", "Watercolor", "Esport/Gaming"] },
-      { id: "color_palette", label: "Palette de Couleurs", type: "select", icon: Palette, options: ["Monochrome", "Pastel", "Neon/Cyberpunk", "Gold & Black", "Vibrant/Colorful", "Earthy Tones"] },
-      { id: "background_type", label: "Fond", type: "select", icon: Layout, options: ["Fond Blanc Pur", "Fond Noir", "Dégradé", "Mockup sur Papier", "Mockup 3D Enseigne"] }
+      { id: "logo_style", label: "Style", type: "select", icon: PenTool, options: ["Flat Design", "3D Render", "Neon", "Vintage/Retro", "Origami", "Line Art", "Watercolor", "Esport/Gaming"] },
+      { id: "logo_color", label: "Color Palette", type: "select", icon: Palette, options: ["Monochrome", "Pastel", "Neon/Cyberpunk", "Gold & Black", "Vibrant/Colorful", "Earthy Tones"] },
+      { id: "logo_background", label: "Background", type: "select", icon: Layout, options: ["Transparent/White", "Dark/Black", "Gradient", "Mockup on Paper", "Mockup 3D Sign"] }
     ]
   },
   H: {
@@ -175,6 +175,15 @@ export const config: Record<string, any> = {
     attrs: [
       { id: "video_style", label: "Video Style", type: "select", icon: Clapperboard, options: ["Cinematic", "Animated", "Abstract", "Photorealistic", "Cartoon", "Stop Motion"] },
       { id: "video_duration", label: "Duration", type: "select", icon: Clock, options: ["Short (5s)", "Medium (15s)", "Long (30s)"] }
+    ]
+  },
+  VA: {
+    label: "🎞️ Video Animation",
+    role: "AI Animation Director",
+    layouts: { VA0: "Short Animation Loop", VA1: "Character Animation Scene", VA2: "Abstract Motion Graphic" },
+    attrs: [
+      { id: "animation_style", label: "Animation Style", type: "select", icon: Clapperboard, options: ["2D Toon", "3D Realistic", "Stop Motion", "Motion Graphics"] },
+      { id: "animation_length", label: "Length", type: "select", icon: Clock, options: ["Short (2s)", "Looping", "Medium (10s)", "Long (20s)"] }
     ]
   }
 };
