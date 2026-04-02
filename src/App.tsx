@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag } from 'lucide-react';
+import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag, Menu, Search, User, Activity, Ghost, Box, Building, Trees, Car, PenTool, Zap, Brain, Shirt, Clapperboard, Sword, Layout } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import ReactCrop, { type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -7,6 +7,7 @@ import { config, angles, stylesData, stylesValue, lightsData, lightsValue, bgsDa
 import { LiveAssistant } from './components/LiveAssistant';
 import { ThemeSettings } from './components/ThemeSettings';
 import { Chatbot } from './components/Chatbot';
+import { saveGallery, loadGallery } from './lib/db';
 
 interface AppState {
   category: string;
@@ -62,6 +63,10 @@ const PREDEFINED_SUBJECTS = [
 ];
 
 export default function App() {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [styleSearch, setStyleSearch] = useState('');
+  const [lightSearch, setLightSearch] = useState('');
+  const [bgSearch, setBgSearch] = useState('');
   const [category, setCategory] = useState('A');
   const [layout, setLayout] = useState('A0');
   const [subject, setSubject] = useState('');
@@ -128,6 +133,14 @@ export default function App() {
   const [galleryFilter, setGalleryFilter] = useState<string>('All');
   const [galleryTagFilter, setGalleryTagFilter] = useState<string>('All');
   const [tagInput, setTagInput] = useState<Record<string, string>>({});
+
+  const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
+  const [variations, setVariations] = useState<string[]>([]);
+  const [showVariationsModal, setShowVariationsModal] = useState(false);
+
+  const [isComparisonMode, setIsComparisonMode] = useState(false);
+  const [selectedForComparison, setSelectedForComparison] = useState<string[]>([]);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
 
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -206,26 +219,45 @@ export default function App() {
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Enter: Copy Prompt
       if (e.ctrlKey && e.key === 'Enter') {
         handleCopy();
       }
+      // Shift+Enter: Generate Image
+      if (e.shiftKey && e.key === 'Enter') {
+        e.preventDefault();
+        handleGenerateImage();
+      }
+      // Alt+1-7: Switch Categories
       if (e.altKey && e.key >= '1' && e.key <= '7') {
         const cats = Object.keys(config);
         const index = parseInt(e.key) - 1;
         if (cats[index]) setCategory(cats[index]);
       }
+      // Ctrl+Z: Undo
       if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
       }
+      // Ctrl+Y or Ctrl+Shift+Z: Redo
       if (e.ctrlKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault();
         handleRedo();
       }
+      // Ctrl+S: Export
+      if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        handleExport();
+      }
+      // Ctrl+G: Generate Variations
+      if (e.ctrlKey && e.key === 'g') {
+        e.preventDefault();
+        handleGenerateVariations();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [generatedPrompt, canUndo, canRedo]);
+  }, [generatedPrompt, canUndo, canRedo, presets, history, gallery]);
 
   // Narrator Logic
   useEffect(() => {
@@ -234,7 +266,7 @@ export default function App() {
       return;
     }
     
-    const msg = new SpeechSynthesisUtterance("Bonjour, je suis Hildegarde, votre narratrice. Bienvenue dans Tho0r-Craft. Je peux maintenant vous aider avec l'Image to Image et les tags de galerie ! / Hello, I am Hildegarde, your narrator. Welcome to Tho0r-Craft. I can now help you with Image to Image and gallery tags!");
+    const msg = new SpeechSynthesisUtterance("Bonjour, je suis Hildegarde, votre narratrice. Bienvenue dans Tho0r-Craft. Je peux maintenant vous aider avec l'import/export, les raccourcis clavier, le menu latéral, le mode focus automatique et le téléchargement direct des images ! / Hello, I am Hildegarde, your narrator. Welcome to Tho0r-Craft. I can now help you with import/export, keyboard shortcuts, the sidebar, auto-focus mode, and direct image downloads!");
     msg.pitch = 1.2;
     msg.rate = 0.9;
     window.speechSynthesis.speak(msg);
@@ -276,14 +308,25 @@ export default function App() {
     };
   }, [isMagnifierActive]);
 
-  // Load presets and history on mount
+  // Load presets, history, and gallery on mount
   useEffect(() => {
     const savedPresets = localStorage.getItem('promptcraft_presets');
     if (savedPresets) setPresets(JSON.parse(savedPresets));
     
     const savedHistory = localStorage.getItem('promptcraft_history');
     if (savedHistory) setHistory(JSON.parse(savedHistory));
+
+    loadGallery().then(savedGallery => {
+      if (savedGallery && savedGallery.length > 0) {
+        setGallery(savedGallery);
+      }
+    });
   }, []);
+
+  // Save gallery to IndexedDB when it changes
+  useEffect(() => {
+    saveGallery(gallery);
+  }, [gallery]);
 
   // Update layout when category changes
   useEffect(() => {
@@ -487,6 +530,7 @@ export default function App() {
           setRotationImages(images);
           setGeneratedImage(images[0]);
           setGallery(prev => [{ image: images[0], prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+          setIsFocusMode(true);
         } else {
           throw new Error("No image data returned for rotation. This may be due to safety filters or an invalid prompt.");
         }
@@ -519,12 +563,14 @@ export default function App() {
           const imgData = `data:image/png;base64,${inlineData.data}`;
           setGeneratedImage(imgData);
           setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+          setIsFocusMode(true);
         } else if (generatedImages && generatedImages.length > 0) {
           const imgBytes = generatedImages[0].image?.imageBytes || generatedImages[0].image?.image_bytes;
           if (imgBytes) {
             const imgData = `data:image/png;base64,${imgBytes}`;
             setGeneratedImage(imgData);
             setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+            setIsFocusMode(true);
           } else {
             throw new Error("generatedImages found but no imageBytes");
           }
@@ -554,6 +600,62 @@ export default function App() {
     a.download = 'tho0r-craft_export.json';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const data = JSON.parse(event.target?.result as string);
+          if (data.presets) {
+            setPresets(data.presets);
+            localStorage.setItem('promptcraft_presets', JSON.stringify(data.presets));
+          }
+          if (data.history) {
+            setHistory(data.history);
+            localStorage.setItem('promptcraft_history', JSON.stringify(data.history));
+          }
+          if (data.gallery) {
+            setGallery(data.gallery);
+          }
+          alert("Données importées avec succès !");
+        } catch (err) {
+          alert("Erreur lors de l'importation. Le fichier est invalide.");
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  const handleGenerateVariations = async () => {
+    if (!generatedPrompt) return;
+    setIsGeneratingVariations(true);
+    setShowVariationsModal(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Generate 3 completely different variations of this image generation prompt. Keep the core subject but drastically change the art style, lighting, and atmosphere. The output MUST be strictly in English. Return ONLY a JSON array of 3 strings. Original prompt: ${generatedPrompt}`,
+        config: { responseMimeType: "application/json" }
+      });
+      if (response.text) {
+        const data = JSON.parse(response.text);
+        if (Array.isArray(data)) {
+          setVariations(data);
+        }
+      }
+    } catch (error) {
+      console.error("Variations error:", error);
+    } finally {
+      setIsGeneratingVariations(false);
+    }
   };
 
   const handleEnhance = async () => {
@@ -765,6 +867,7 @@ export default function App() {
           setGeneratedImage(newImgData);
         }
         setGallery(prev => [{ image: newImgData, prompt: generatedPrompt + " (Upscaled 2K)", time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+        setIsFocusMode(true);
       } else {
         throw new Error("No image data returned from upscaler.");
       }
@@ -887,14 +990,80 @@ export default function App() {
   const allTags = Array.from(new Set(gallery.flatMap(item => item.tags || []))).sort();
 
   return (
-    <div className="min-h-screen p-4 md:p-8 font-sans">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-12 text-center relative flex flex-col items-center">
-          <img src="/logo.png" alt="Tho0r-Craft Logo" className="h-40 mb-2 object-contain drop-shadow-[0_0_25px_rgba(255,215,0,0.3)]" onError={(e) => e.currentTarget.style.display = 'none'} />
-          <h1 className="text-5xl font-extrabold mb-3 tracking-tighter gradient-text">Tho0r-Craft</h1>
-          <p className="text-theme-muted font-medium tracking-wide uppercase italic">Director Console • Ultimate Edition</p>
-          
-          <div className="absolute top-0 right-0 md:top-2 md:right-4 flex items-center gap-2">
+    <div className="min-h-screen font-sans flex flex-col md:flex-row">
+      {/* SIDEBAR */}
+      <aside className={`bg-theme-panel border-r border-theme-border p-4 md:p-6 flex flex-col gap-6 md:h-screen md:sticky md:top-0 overflow-y-auto z-40 shadow-2xl transition-all duration-300 ${isSidebarCollapsed ? 'w-full md:w-auto' : 'w-full md:w-64'}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Tho0r-Craft Logo" className="h-12 object-contain drop-shadow-[0_0_15px_rgba(255,215,0,0.3)]" onError={(e) => e.currentTarget.style.display = 'none'} />
+            <div className="text-left whitespace-nowrap">
+              <h1 className="text-xl font-extrabold tracking-tighter gradient-text">Tho0r-Craft</h1>
+              <p className="text-[8px] text-theme-muted font-medium tracking-widest uppercase italic">Director Console</p>
+            </div>
+          </div>
+          <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="text-theme-muted hover:text-theme-text transition-colors p-1 rounded-lg hover:bg-theme-accent/10">
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
+        
+        {!isSidebarCollapsed && (
+          <div className="flex flex-col gap-2 flex-grow mt-4 animate-in fade-in duration-300">
+            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Categories</label>
+            {Object.entries(config).map(([k, v]) => {
+              const getCategoryIcon = (key: string) => {
+                switch(key) {
+                  case 'A': return <User className="w-4 h-4" />;
+                  case 'B': return <Activity className="w-4 h-4" />;
+                  case 'C': return <Ghost className="w-4 h-4" />;
+                  case 'D': return <Box className="w-4 h-4" />;
+                  case 'E': return <Building className="w-4 h-4" />;
+                  case 'F': return <Trees className="w-4 h-4" />;
+                  case 'G': return <Car className="w-4 h-4" />;
+                  case 'H': return <PenTool className="w-4 h-4" />;
+                  case 'I': return <Ghost className="w-4 h-4" />;
+                  case 'J': return <Zap className="w-4 h-4" />;
+                  case 'K': return <Brain className="w-4 h-4" />;
+                  case 'L': return <Shirt className="w-4 h-4" />;
+                  case 'M': return <Clapperboard className="w-4 h-4" />;
+                  case 'N': return <Sword className="w-4 h-4" />;
+                  case 'O': return <Box className="w-4 h-4" />;
+                  case 'P': return <Layout className="w-4 h-4" />;
+                  case 'Q': return <Video className="w-4 h-4" />;
+                  case 'R': return <Video className="w-4 h-4" />;
+                  default: return <Layers className="w-4 h-4" />;
+                }
+              };
+              const labelWithoutEmoji = v.label.split(' ').slice(1).join(' ');
+              return (
+                <button
+                  key={k}
+                  onClick={() => {
+                    setCategory(k);
+                    setIsSidebarCollapsed(true);
+                  }}
+                  className={`text-left px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-3 ${category === k ? 'bg-theme-accent text-theme-bg shadow-lg' : 'text-theme-muted hover:bg-theme-accent/10 hover:text-theme-text border border-transparent hover:border-theme-border'}`}
+                >
+                  {getCategoryIcon(k)}
+                  <span>{labelWithoutEmoji}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <main 
+        className="flex-1 p-4 md:p-8 w-full overflow-x-hidden"
+        onClick={() => {
+          if (!isSidebarCollapsed) {
+            setIsSidebarCollapsed(true);
+          }
+        }}
+      >
+        <div className="max-w-6xl mx-auto">
+          <header className="mb-8 flex flex-col md:flex-row items-center justify-end gap-6 relative">
+            <div className="flex items-center gap-2 flex-wrap justify-center md:justify-end">
             <button 
               onClick={handleUndo} 
               disabled={!canUndo}
@@ -911,18 +1080,13 @@ export default function App() {
             >
               <Redo className="w-4 h-4" />
             </button>
-            <button 
-              onClick={handleExport} 
-              className="text-xs font-bold text-theme-accent border border-theme-border hover:bg-theme-accent/10 px-4 py-2 rounded-full transition-all flex items-center gap-2"
-              title="Export Presets, History & Gallery"
-            >
-              <Download className="w-4 h-4" /> EXPORT
-            </button>
             <ThemeSettings 
               isNarratorActive={isNarratorActive}
               setIsNarratorActive={setIsNarratorActive}
               isMagnifierActive={isMagnifierActive}
               setIsMagnifierActive={setIsMagnifierActive}
+              onExport={handleExport}
+              onImport={handleImport}
             />
             <button onClick={() => setShowGuide(true)} className="text-xs font-bold text-theme-accent border border-theme-border hover:bg-theme-accent/10 px-4 py-2 rounded-full transition-all flex items-center gap-2">
               <Info className="w-4 h-4" /> GUIDE
@@ -985,7 +1149,13 @@ export default function App() {
                   onClick={() => setActiveTab('subject')}
                   className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all flex-shrink-0 flex items-center gap-2 ${activeTab === 'subject' ? 'bg-theme-accent text-theme-bg' : 'bg-theme-panel text-theme-muted hover:text-theme-text border border-theme-border'}`}
                 >
-                  <Layers className="w-4 h-4" /> Sujet & ADN
+                  <Layers className="w-4 h-4" /> Sujet
+                </button>
+                <button 
+                  onClick={() => setActiveTab('dna')}
+                  className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all flex-shrink-0 flex items-center gap-2 ${activeTab === 'dna' ? 'bg-theme-accent text-theme-bg' : 'bg-theme-panel text-theme-muted hover:text-theme-text border border-theme-border'}`}
+                >
+                  <Dices className="w-4 h-4" /> ADN Visuel
                 </button>
                 <button 
                   onClick={() => setActiveTab('camera')}
@@ -1004,23 +1174,19 @@ export default function App() {
               {/* TAB CONTENT: SUBJECT */}
               {activeTab === 'subject' && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  {/* CAT & LAYOUT */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Category</label>
-                      <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-4 rounded-xl font-bold text-theme-accent">
-                        {Object.entries(config).map(([k, v]) => (
-                          <option key={k} value={k}>{v.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Structure Layout</label>
-                      <select value={layout} onChange={(e) => setLayout(e.target.value)} className="w-full p-4 rounded-xl">
-                        {Object.entries(config[category].layouts).map(([k, v]) => (
-                          <option key={k} value={k}>{v as string}</option>
-                        ))}
-                      </select>
+                  {/* LAYOUT */}
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Structure Layout</label>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(config[category].layouts).map(([k, v]) => (
+                        <button
+                          key={k}
+                          onClick={() => setLayout(k)}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${layout === k ? 'bg-theme-accent text-theme-bg border-theme-accent shadow-lg' : 'bg-theme-panel text-theme-muted border-theme-border hover:border-theme-accent hover:text-theme-text'}`}
+                        >
+                          {v as string}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
@@ -1041,12 +1207,49 @@ export default function App() {
                 </div>
               )}
 
+              {/* TAB CONTENT: DNA */}
+              {activeTab === 'dna' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {/* ATTRIBUTES */}
+                  <div className="p-6 bg-theme-accent/5 border border-theme-border rounded-2xl">
+                    <label className="block text-[11px] font-black uppercase tracking-widest text-theme-accent mb-4">Visual DNA & Textures</label>
+                    <div className="grid grid-cols-1 gap-6">
+                      {config[category].attrs.map((attr: any) => (
+                        <div key={attr.id}>
+                          <label className="flex items-center gap-1.5 text-[9px] text-theme-muted mb-2 font-black uppercase tracking-widest">
+                            {attr.icon && <attr.icon className="w-3 h-3" />}
+                            {attr.label}
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => setAttributes({...attributes, [attr.id]: ''})}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${!attributes[attr.id] ? 'bg-theme-accent text-theme-bg border-theme-accent shadow-md' : 'bg-theme-bg text-theme-muted border-theme-border hover:border-theme-accent hover:text-theme-text'}`}
+                            >
+                              Auto
+                            </button>
+                            {attr.options.map((o: string) => (
+                              <button
+                                key={o}
+                                onClick={() => setAttributes({...attributes, [attr.id]: o})}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${attributes[attr.id] === o ? 'bg-theme-accent text-theme-bg border-theme-accent shadow-md' : 'bg-theme-bg text-theme-muted border-theme-border hover:border-theme-accent hover:text-theme-text'}`}
+                              >
+                                {o}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* TAB CONTENT: CAMERA */}
               {activeTab === 'camera' && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                   {/* ANGLES */}
                   <div className="p-4 bg-theme-panel rounded-2xl border border-theme-border">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-theme-accent mb-3 italic">1. Camera Angles - Sequence</label>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-theme-accent mb-3 italic">Camera Angles - Sequence</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                       {angles.map(angle => {
                         const getAngleIcon = (id: string) => {
@@ -1077,50 +1280,91 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* ATTRIBUTES */}
-                  <div className="p-6 bg-theme-accent/5 border border-theme-border rounded-2xl">
-                    <label className="block text-[11px] font-black uppercase tracking-widest text-theme-accent mb-4">2. Visual DNA & Textures</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {config[category].attrs.map((attr: any) => (
-                        <div key={attr.id}>
-                          <label className="flex items-center gap-1.5 text-[9px] text-theme-muted mb-1 font-black uppercase tracking-widest">
-                            {attr.icon && <attr.icon className="w-3 h-3" />}
-                            {attr.label}
-                          </label>
-                          <select 
-                            value={attributes[attr.id] || ''} 
-                            onChange={(e) => setAttributes({...attributes, [attr.id]: e.target.value})}
-                            className="w-full p-3 text-xs rounded-xl"
-                          >
-                            <option value="">-- Choose --</option>
-                            {attr.options.map((o: string) => (
-                              <option key={o} value={o}>{o}</option>
-                            ))}
-                          </select>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
                   {/* TECHNIQUE */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 gap-6">
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Art Direction</label>
-                      <select value={style} onChange={(e) => setStyle(e.target.value)} className="w-full p-3 rounded-xl text-sm">
-                        {Object.entries(stylesData).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted">Art Direction</label>
+                        <div className="relative">
+                          <Search className="w-3 h-3 absolute left-2 top-1/2 transform -translate-y-1/2 text-theme-muted" />
+                          <input 
+                            type="text" 
+                            placeholder="Search..." 
+                            value={styleSearch}
+                            onChange={(e) => setStyleSearch(e.target.value)}
+                            className="pl-7 pr-2 py-1 text-[10px] bg-theme-bg border border-theme-border rounded-md text-theme-text focus:border-theme-accent outline-none w-full sm:w-48"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 bg-theme-bg/50 rounded-xl border border-theme-border">
+                        {Object.entries(stylesData)
+                          .filter(([_, v]) => v.toLowerCase().includes(styleSearch.toLowerCase()))
+                          .map(([k, v]) => (
+                          <button
+                            key={k}
+                            onClick={() => setStyle(k)}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${style === k ? 'bg-theme-accent text-theme-bg border-theme-accent shadow-md' : 'bg-theme-panel text-theme-muted border-theme-border hover:border-theme-accent hover:text-theme-text'}`}
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Lighting</label>
-                      <select value={lighting} onChange={(e) => setLighting(e.target.value)} className="w-full p-3 rounded-xl text-sm">
-                        {Object.entries(lightsData).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted">Lighting</label>
+                        <div className="relative">
+                          <Search className="w-3 h-3 absolute left-2 top-1/2 transform -translate-y-1/2 text-theme-muted" />
+                          <input 
+                            type="text" 
+                            placeholder="Search..." 
+                            value={lightSearch}
+                            onChange={(e) => setLightSearch(e.target.value)}
+                            className="pl-7 pr-2 py-1 text-[10px] bg-theme-bg border border-theme-border rounded-md text-theme-text focus:border-theme-accent outline-none w-full sm:w-48"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-theme-bg/50 rounded-xl border border-theme-border">
+                        {Object.entries(lightsData)
+                          .filter(([_, v]) => v.toLowerCase().includes(lightSearch.toLowerCase()))
+                          .map(([k, v]) => (
+                          <button
+                            key={k}
+                            onClick={() => setLighting(k)}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${lighting === k ? 'bg-theme-accent text-theme-bg border-theme-accent shadow-md' : 'bg-theme-panel text-theme-muted border-theme-border hover:border-theme-accent hover:text-theme-text'}`}
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Background</label>
-                      <select value={background} onChange={(e) => setBackground(e.target.value)} className="w-full p-3 rounded-xl text-sm">
-                        {Object.entries(bgsData).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-[10px] font-black uppercase tracking-widest text-theme-muted">Background</label>
+                        <div className="relative">
+                          <Search className="w-3 h-3 absolute left-2 top-1/2 transform -translate-y-1/2 text-theme-muted" />
+                          <input 
+                            type="text" 
+                            placeholder="Search..." 
+                            value={bgSearch}
+                            onChange={(e) => setBgSearch(e.target.value)}
+                            className="pl-7 pr-2 py-1 text-[10px] bg-theme-bg border border-theme-border rounded-md text-theme-text focus:border-theme-accent outline-none w-full sm:w-48"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-theme-bg/50 rounded-xl border border-theme-border">
+                        {Object.entries(bgsData)
+                          .filter(([_, v]) => v.toLowerCase().includes(bgSearch.toLowerCase()))
+                          .map(([k, v]) => (
+                          <button
+                            key={k}
+                            onClick={() => setBackground(k)}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${background === k ? 'bg-theme-accent text-theme-bg border-theme-accent shadow-md' : 'bg-theme-panel text-theme-muted border-theme-border hover:border-theme-accent hover:text-theme-text'}`}
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -1128,12 +1372,25 @@ export default function App() {
                   <div className="p-5 bg-theme-panel rounded-2xl border border-theme-border">
                     <label className="block text-[10px] font-black uppercase tracking-widest text-theme-accent mb-3">Optics</label>
                     <div className="flex flex-col gap-4">
-                      <select value={lens} onChange={(e) => setLens(e.target.value)} className="p-2 text-xs rounded-lg w-full bg-theme-bg border border-theme-border text-theme-text focus:border-theme-accent outline-none transition-colors">
-                        <option value="">Lens: Auto</option>
-                        <option value="85mm lens f/1.8">Portrait (85mm)</option>
-                        <option value="35mm lens">Standard (35mm)</option>
-                        <option value="24mm wide angle">Wide (24mm)</option>
-                      </select>
+                      <div>
+                        <label className="block text-[9px] font-bold uppercase tracking-wider text-theme-muted mb-2">Lens</label>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { label: 'Auto', value: '' },
+                            { label: 'Portrait (85mm)', value: '85mm lens f/1.8' },
+                            { label: 'Standard (35mm)', value: '35mm lens' },
+                            { label: 'Wide (24mm)', value: '24mm wide angle' }
+                          ].map((l) => (
+                            <button
+                              key={l.label}
+                              onClick={() => setLens(l.value)}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${lens === l.value ? 'bg-theme-accent text-theme-bg border-theme-accent shadow-md' : 'bg-theme-bg text-theme-muted border-theme-border hover:border-theme-accent hover:text-theme-text'}`}
+                            >
+                              {l.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       
                       <div>
                         <label className="block text-[9px] font-bold uppercase tracking-wider text-theme-muted mb-2">Aspect Ratio</label>
@@ -1495,7 +1752,15 @@ export default function App() {
                   >
                     {isEnhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} ENHANCE
                   </button>
-                  <button onClick={handleGenerateImage} disabled={isGeneratingImage} className="bg-theme-panel border border-theme-border hover:border-theme-accent text-theme-text px-4 py-2 rounded-full font-black text-xs tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2 disabled:opacity-50">
+                  <button 
+                    onClick={handleGenerateVariations} 
+                    disabled={isGeneratingVariations || !generatedPrompt} 
+                    className="bg-theme-panel border border-theme-border hover:border-theme-accent text-theme-text px-4 py-2 rounded-full font-black text-xs tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                    title="Generate Variations (Ctrl+G)"
+                  >
+                    {isGeneratingVariations ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />} VARIATIONS
+                  </button>
+                  <button onClick={handleGenerateImage} disabled={isGeneratingImage} className="bg-theme-panel border border-theme-border hover:border-theme-accent text-theme-text px-4 py-2 rounded-full font-black text-xs tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2 disabled:opacity-50" title="Generate Image (Shift+Enter)">
                     {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />} GENERATE
                   </button>
                   <button onClick={handleCopy} className="bg-theme-accent hover:opacity-80 text-theme-bg px-6 py-2 rounded-full font-black text-xs tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2">
@@ -1698,22 +1963,76 @@ export default function App() {
                       <option value="prompt">Prompt (A-Z)</option>
                       <option value="category">Category (A-Z)</option>
                     </select>
+                    <button
+                      onClick={() => {
+                        setIsComparisonMode(!isComparisonMode);
+                        if (isComparisonMode) setSelectedForComparison([]);
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors border ${isComparisonMode ? 'bg-theme-accent text-theme-bg border-theme-accent' : 'bg-theme-panel text-theme-muted border-theme-border hover:text-theme-accent'}`}
+                    >
+                      {isComparisonMode ? 'Cancel Comparison' : 'Compare Images'}
+                    </button>
+                    {isComparisonMode && selectedForComparison.length === 2 && (
+                      <button
+                        onClick={() => setShowComparisonModal(true)}
+                        className="px-3 py-1 rounded-lg text-xs font-bold bg-green-500 text-white hover:bg-green-600 transition-colors"
+                      >
+                        View Comparison
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2">
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${isFocusMode ? 'lg:grid-cols-3 xl:grid-cols-4' : (isSidebarCollapsed ? 'xl:grid-cols-3' : '')} gap-4 max-h-[600px] overflow-y-auto pr-2`}>
                   {filteredAndSortedGallery.map((item) => (
-                    <div key={item.image} className="bg-theme-panel rounded-xl overflow-hidden border border-theme-border group transition-all duration-500 hover:shadow-[0_0_20px_var(--accent)] hover:border-theme-accent">
-                      <div className="relative cursor-pointer overflow-hidden" onClick={() => setZoomedImage(item.image)}>
+                    <div key={item.image} className={`bg-theme-panel rounded-xl overflow-hidden border group transition-all duration-500 hover:shadow-[0_0_20px_var(--accent)] ${selectedForComparison.includes(item.image) ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'border-theme-border hover:border-theme-accent'}`}>
+                      <div className="relative cursor-pointer overflow-hidden" onClick={() => {
+                        if (isComparisonMode) {
+                          setSelectedForComparison(prev => {
+                            if (prev.includes(item.image)) return prev.filter(img => img !== item.image);
+                            if (prev.length >= 2) return [prev[1], item.image];
+                            return [...prev, item.image];
+                          });
+                        } else {
+                          setZoomedImage(item.image);
+                        }
+                      }}>
                         <img 
                           src={item.image} 
                           alt="Generated" 
-                          className="w-full h-auto object-cover aspect-square transition-transform duration-500 group-hover:scale-110"
+                          className={`w-full h-auto object-cover aspect-square transition-transform duration-500 ${isComparisonMode ? '' : 'group-hover:scale-110'}`}
                           draggable
                           onDragStart={(e) => e.dataTransfer.setData('text/plain', item.image)}
                         />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center pointer-events-none">
-                          <ZoomIn className="w-8 h-8 text-white" />
-                        </div>
+                        {!isComparisonMode && (
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center pointer-events-none">
+                            <ZoomIn className="w-8 h-8 text-white" />
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const link = document.createElement('a');
+                                link.href = item.image;
+                                link.download = `generated-${item.time.replace(/:/g, '-')}.png`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-theme-accent text-white rounded-full transition-colors pointer-events-auto"
+                              title="Download Image"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        {isComparisonMode && (
+                          <div className="absolute top-2 left-2">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedForComparison.includes(item.image)}
+                              readOnly
+                              className="w-5 h-5 accent-green-500 pointer-events-none"
+                            />
+                          </div>
+                        )}
                       </div>
                       <div className="p-3">
                         <div className="flex justify-between items-center mb-2">
@@ -1845,6 +2164,101 @@ export default function App() {
         </div>
       )}
 
+      {/* COMPARISON MODAL */}
+      {showComparisonModal && selectedForComparison.length === 2 && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[60] flex items-center justify-center p-4" onClick={() => setShowComparisonModal(false)}>
+          <div className="bg-theme-bg border border-theme-border rounded-3xl p-6 max-w-[95vw] w-full max-h-[95vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6 border-b border-theme-border pb-4">
+              <h2 className="text-2xl font-bold text-theme-text flex items-center gap-3">
+                <span className="bg-theme-accent/20 p-2 rounded-xl text-theme-accent">
+                  <Eye className="w-6 h-6" />
+                </span>
+                Image Comparison
+              </h2>
+              <button onClick={() => setShowComparisonModal(false)} className="text-theme-muted hover:text-theme-text transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {[0, 1].map(index => {
+                const imgData = gallery.find(g => g.image === selectedForComparison[index]);
+                if (!imgData) return null;
+                return (
+                  <div key={index} className="flex flex-col gap-4">
+                    <div className="bg-theme-panel rounded-2xl overflow-hidden border border-theme-border">
+                      <img src={imgData.image} alt={`Comparison ${index + 1}`} className="w-full h-auto object-contain max-h-[50vh]" />
+                    </div>
+                    <div className="bg-theme-panel p-4 rounded-xl border border-theme-border flex-1">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-bold text-theme-accent uppercase tracking-widest">Image {index + 1}</span>
+                        <span className="text-[10px] text-theme-muted">{imgData.time}</span>
+                      </div>
+                      <p className="text-sm text-theme-text font-mono leading-relaxed">{imgData.prompt}</p>
+                      {imgData.tags && imgData.tags.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {imgData.tags.map(tag => (
+                            <span key={tag} className="text-[10px] bg-theme-bg border border-theme-border px-2 py-1 rounded text-theme-muted">
+                              <Tag className="w-3 h-3 inline mr-1" /> {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VARIATIONS MODAL */}
+      {showVariationsModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowVariationsModal(false)}>
+          <div className="bg-theme-bg border border-theme-border rounded-3xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6 border-b border-theme-border pb-4">
+              <h2 className="text-2xl font-bold text-theme-text flex items-center gap-3">
+                <span className="bg-theme-accent/20 p-2 rounded-xl text-theme-accent">
+                  <Layers className="w-6 h-6" />
+                </span>
+                Prompt Variations
+              </h2>
+              <button onClick={() => setShowVariationsModal(false)} className="text-theme-muted hover:text-theme-text transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {isGeneratingVariations ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="w-12 h-12 animate-spin text-theme-accent mb-4" />
+                  <p className="text-theme-muted font-bold tracking-widest uppercase">Generating Variations...</p>
+                </div>
+              ) : (
+                variations.map((variation, index) => (
+                  <div key={index} className="bg-theme-panel p-4 rounded-xl border border-theme-border group">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-bold text-theme-accent uppercase tracking-widest">Variation {index + 1}</span>
+                      <button 
+                        onClick={() => {
+                          setGeneratedPrompt(variation);
+                          setShowVariationsModal(false);
+                        }}
+                        className="text-[10px] bg-theme-accent text-theme-bg px-3 py-1 rounded-full font-bold hover:opacity-90 transition-opacity"
+                      >
+                        USE THIS
+                      </button>
+                    </div>
+                    <p className="text-sm text-theme-text font-mono leading-relaxed">{variation}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* GUIDE MODAL */}
       {showGuide && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowGuide(false)}>
@@ -1928,25 +2342,54 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>6.</span> Galerie & Tags Personnalisés
+                  <span>6.</span> Galerie, Tags & Comparaison
                 </h3>
                 <p className="text-theme-muted">
-                  Toutes vos générations sont sauvegardées dans la <strong className="text-theme-text">Galerie</strong>. Vous pouvez désormais ajouter des <strong className="text-theme-text">Tags personnalisés</strong> à chaque image pour mieux les organiser, et utiliser les filtres pour retrouver facilement vos créations par catégorie ou par tag.
+                  Toutes vos générations sont sauvegardées dans la <strong className="text-theme-text">Galerie</strong>. Vous pouvez ajouter des <strong className="text-theme-text">Tags personnalisés</strong> à chaque image, et utiliser le bouton de <strong className="text-theme-text">Téléchargement direct</strong> sur chaque miniature.
+                  <br/><br/>
+                  Le mode <strong className="text-theme-text">Comparaison</strong> vous permet de sélectionner deux images de votre galerie pour les afficher côte à côte et analyser l'impact de vos changements de prompt.
                 </p>
               </div>
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>7.</span> Sauvegarde & Historique
+                  <span>7.</span> Menu Latéral & Mode Focus
                 </h3>
                 <p className="text-theme-muted">
-                  Utilisez les <strong className="text-theme-text">Presets</strong> pour enregistrer vos configurations favorites (ex: "Mon Style Pixar"). 
-                  L'<strong className="text-theme-text">Historique</strong> garde automatiquement une trace de tous les prompts que vous avez copiés lors de votre session.
+                  Le nouveau <strong className="text-theme-text">Menu Latéral</strong> rétractable vous permet de naviguer rapidement entre les catégories. Il se ferme automatiquement sur mobile pour vous laisser l'espace de travail.
+                  <br/><br/>
+                  Après chaque génération, l'application passe en <strong className="text-theme-text">Mode Focus</strong> pour masquer les paramètres et vous concentrer sur le résultat et votre galerie.
+                </p>
+              </div>
+
+              <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
+                <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <span>8.</span> Sauvegarde, Historique & Export
+                </h3>
+                <p className="text-theme-muted">
+                  Utilisez les <strong className="text-theme-text">Presets</strong> pour enregistrer vos configurations favorites. L'<strong className="text-theme-text">Historique</strong> garde une trace de vos prompts copiés.
+                  <br/><br/>
+                  Vous pouvez désormais <strong className="text-theme-text">Exporter (Ctrl+S)</strong> et <strong className="text-theme-text">Importer</strong> l'intégralité de vos données (Presets, Historique, Galerie) depuis le menu <strong className="text-theme-text">PARAMÈTRES</strong>.
                 </p>
               </div>
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>8.</span> L'Assistante Vocale (Microphone)
+                  <span>9.</span> Variations & Raccourcis Clavier
+                </h3>
+                <p className="text-theme-muted">
+                  Le bouton <strong className="text-theme-text">VARIATIONS (Ctrl+G)</strong> permet à l'IA de générer 3 prompts alternatifs (en anglais) basés sur votre idée actuelle, en explorant d'autres styles et ambiances.
+                  <br/><br/>
+                  <strong className="text-theme-text">Raccourcis utiles :</strong><br/>
+                  - <kbd className="bg-theme-bg px-1 rounded border border-theme-border">Ctrl+Enter</kbd> : Copier le prompt<br/>
+                  - <kbd className="bg-theme-bg px-1 rounded border border-theme-border">Shift+Enter</kbd> : Générer l'image<br/>
+                  - <kbd className="bg-theme-bg px-1 rounded border border-theme-border">Ctrl+Z / Ctrl+Y</kbd> : Annuler / Rétablir<br/>
+                  - <kbd className="bg-theme-bg px-1 rounded border border-theme-border">Alt+1 à 7</kbd> : Changer de catégorie
+                </p>
+              </div>
+
+              <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
+                <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <span>9.</span> L'Assistante Vocale (Microphone)
                 </h3>
                 <p className="text-theme-muted">
                   En cliquant sur l'icône <strong className="text-theme-text">Microphone</strong> (en haut à droite), vous pouvez discuter directement avec <strong className="text-theme-text">Hildegarde</strong>, votre assistante vocale. Elle a une voix douce et amicale, et elle est là pour vous aider à trouver des idées, étoffer vos descriptions, ou vous suggérer des styles et des ambiances pour vos créations.
@@ -1955,7 +2398,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>9.</span> Accessibilité
+                  <span>10.</span> Accessibilité
                 </h3>
                 <p className="text-theme-muted">
                   Dans les <strong className="text-theme-text">PARAMÈTRES</strong> (en haut à droite), vous pouvez activer <strong className="text-theme-text">Hildegarde en mode Narratrice</strong> pour les personnes non-voyantes (qui lit l'interface au survol) ainsi qu'une <strong className="text-theme-text">Loupe (Zoom UI)</strong> pour les personnes malvoyantes.
@@ -2055,6 +2498,7 @@ export default function App() {
 
       <Chatbot />
       <LiveAssistant onTranscript={(text) => setSubject(prev => prev ? prev + ' ' + text : text)} />
+      </main>
     </div>
   );
 }

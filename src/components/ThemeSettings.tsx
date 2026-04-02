@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Volume2, ZoomIn, Palette, Save, Trash2, Plus } from 'lucide-react';
+import { Settings, Volume2, ZoomIn, Palette, Save, Trash2, Plus, Download, Upload } from 'lucide-react';
 
 const PRESET_THEMES = [
   { id: 'sombre', label: 'Sombre' },
@@ -43,12 +43,16 @@ export function ThemeSettings({
   isNarratorActive,
   setIsNarratorActive,
   isMagnifierActive,
-  setIsMagnifierActive
+  setIsMagnifierActive,
+  onExport,
+  onImport
 }: {
   isNarratorActive: boolean;
   setIsNarratorActive: (v: boolean) => void;
   isMagnifierActive: boolean;
   setIsMagnifierActive: (v: boolean) => void;
+  onExport: () => void;
+  onImport: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentTheme, setCurrentTheme] = useState('sombre');
@@ -229,6 +233,24 @@ export function ThemeSettings({
                   className="w-4 h-4 rounded text-theme-accent bg-theme-panel border-theme-border" 
                 />
               </label>
+            </div>
+
+            <div className="px-4 py-2 border-b border-theme-border mb-2">
+              <h3 className="text-sm font-bold text-theme-text uppercase tracking-widest">Données</h3>
+            </div>
+            <div className="px-4 py-2 flex flex-col gap-2 border-b border-theme-border mb-2">
+              <button 
+                onClick={() => { onExport(); setIsOpen(false); }}
+                className="w-full text-left text-xs font-bold text-theme-accent hover:bg-theme-accent/10 px-3 py-2 rounded-lg transition-all flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" /> EXPORT (Presets & Gallery)
+              </button>
+              <button 
+                onClick={() => { onImport(); setIsOpen(false); }}
+                className="w-full text-left text-xs font-bold text-theme-accent hover:bg-theme-accent/10 px-3 py-2 rounded-lg transition-all flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" /> IMPORT (Data)
+              </button>
             </div>
 
             <div className="px-4 py-2 border-b border-theme-border mb-2 flex justify-between items-center">
