@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag, Menu, Search, User, Activity, Ghost, Box, Building, Trees, Car, PenTool, Zap, Brain, Shirt, Clapperboard, Sword, Layout, Skull, PawPrint, Home, Utensils, Bookmark } from 'lucide-react';
+import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag, Menu, Search, User, Activity, Ghost, Box, Building, Trees, Car, PenTool, Zap, Brain, Shirt, Clapperboard, Sword, Layout, Skull, PawPrint, Home, Utensils, Bookmark, Heart } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import ReactCrop, { type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -147,7 +147,7 @@ export default function App() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [gallery, setGallery] = useState<{image: string, prompt: string, time: string, category: string, timestamp: number, tags?: string[]}[]>([]);
+  const [gallery, setGallery] = useState<{image: string, prompt: string, time: string, category: string, timestamp: number, tags?: string[], isFavorite?: boolean}[]>([]);
   const [gallerySort, setGallerySort] = useState<'date_desc' | 'date_asc' | 'prompt' | 'category'>('date_desc');
   const [galleryFilter, setGalleryFilter] = useState<string>('All');
   const [galleryTagFilter, setGalleryTagFilter] = useState<string>('All');
@@ -1027,7 +1027,11 @@ export default function App() {
   };
 
   const filteredAndSortedGallery = [...gallery]
-    .filter(item => galleryFilter === 'All' || (item.category || 'Unknown') === galleryFilter)
+    .filter(item => {
+      if (galleryFilter === 'All') return true;
+      if (galleryFilter === 'Favorites') return item.isFavorite;
+      return (item.category || 'Unknown') === galleryFilter;
+    })
     .filter(item => galleryTagFilter === 'All' || (item.tags && item.tags.includes(galleryTagFilter)))
     .sort((a, b) => {
       const timeA = a.timestamp || 0;
@@ -2076,9 +2080,60 @@ export default function App() {
                 <div className="flex flex-col gap-4 mb-6">
                   <div className="flex justify-between items-center">
                     <h3 className="text-sm font-bold text-theme-accent uppercase tracking-widest">Visual Gallery</h3>
-                    <button onClick={() => setGallery([])} className="text-xs text-theme-muted hover:text-red-500 transition-colors flex items-center gap-1">
-                      <Trash2 className="w-3 h-3" /> Clear
-                    </button>
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = '.json';
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              try {
+                                const data = JSON.parse(event.target?.result as string);
+                                if (data.gallery) {
+                                  setGallery(data.gallery);
+                                  alert("Galerie importée avec succès !");
+                                } else {
+                                  alert("Fichier invalide : aucune galerie trouvée.");
+                                }
+                              } catch (err) {
+                                alert("Erreur lors de l'importation.");
+                              }
+                            };
+                            reader.readAsText(file);
+                          };
+                          input.click();
+                        }}
+                        className="text-xs text-theme-muted hover:text-theme-accent transition-colors flex items-center gap-1"
+                        title="Importer une galerie"
+                      >
+                        <Upload className="w-3 h-3" /> Import
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const data = { gallery };
+                          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = 'tho0r-craft_gallery.json';
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="text-xs text-theme-muted hover:text-theme-accent transition-colors flex items-center gap-1"
+                        title="Exporter la galerie"
+                      >
+                        <Download className="w-3 h-3" /> Export
+                      </button>
+                      <button onClick={() => setGallery([])} className="text-xs text-theme-muted hover:text-red-500 transition-colors flex items-center gap-1">
+                        <Trash2 className="w-3 h-3" /> Clear
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <select 
@@ -2087,6 +2142,7 @@ export default function App() {
                       className="bg-theme-panel border border-theme-border rounded-lg text-xs p-2 text-theme-text focus:border-theme-accent outline-none"
                     >
                       <option value="All">All Categories</option>
+                      <option value="Favorites">⭐ Favorites</option>
                       {Array.from(new Set(gallery.map(g => g.category || 'Unknown'))).map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
@@ -2151,6 +2207,16 @@ export default function App() {
                           draggable
                           onDragStart={(e) => e.dataTransfer.setData('text/plain', item.image)}
                         />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setGallery(prev => prev.map(g => g.image === item.image ? { ...g, isFavorite: !g.isFavorite } : g));
+                          }}
+                          className="absolute top-2 left-2 p-2 bg-black/50 hover:bg-theme-accent text-white rounded-full transition-colors pointer-events-auto z-10"
+                          title={item.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+                        >
+                          <Heart className={`w-4 h-4 ${item.isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
+                        </button>
                         {!isComparisonMode && (
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center pointer-events-none">
                             <ZoomIn className="w-8 h-8 text-white" />
@@ -2220,40 +2286,53 @@ export default function App() {
                           </button>
                         </div>
 
-                        <div className="mt-3 flex gap-2">
+                        <div className="mt-3 flex flex-wrap gap-2">
                           <button 
                             onClick={() => {
-                              navigator.clipboard.writeText(item.prompt);
-                              triggerToast();
+                              setReferenceImage(item.image);
+                              setImg2img(true);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
-                            className="flex-1 py-1 bg-theme-bg border border-theme-border rounded text-xs text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors flex items-center justify-center gap-1"
-                            title="Copy Prompt"
+                            className="w-full py-1.5 bg-theme-bg border border-theme-border rounded text-xs text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors flex items-center justify-center gap-1"
+                            title="Use as Reference (Img2Img)"
                           >
-                            <Copy className="w-3 h-3" />
+                            <Image className="w-3 h-3" /> Utiliser comme Réf.
                           </button>
-                          <button 
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = item.image;
-                              link.download = `generated-${item.time.replace(/:/g, '-')}.png`;
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                            }}
-                            className="flex-1 py-1 bg-theme-bg border border-theme-border rounded text-xs text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors flex items-center justify-center gap-1"
-                            title="Download Image"
-                          >
-                            <Download className="w-3 h-3" />
-                          </button>
-                          <button 
-                            onClick={() => {
-                              setGallery(prev => prev.filter(g => g.image !== item.image));
-                            }}
-                            className="flex-1 py-1 bg-theme-bg border border-theme-border rounded text-xs text-red-400 hover:text-red-500 hover:border-red-500 transition-colors flex items-center justify-center gap-1"
-                            title="Delete Image"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          <div className="flex gap-2 w-full">
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(item.prompt);
+                                triggerToast();
+                              }}
+                              className="flex-1 py-1.5 bg-theme-bg border border-theme-border rounded text-xs text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors flex items-center justify-center gap-1"
+                              title="Copy Prompt"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = item.image;
+                                link.download = `generated-${item.time.replace(/:/g, '-')}.png`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="flex-1 py-1.5 bg-theme-bg border border-theme-border rounded text-xs text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors flex items-center justify-center gap-1"
+                              title="Download Image"
+                            >
+                              <Download className="w-3 h-3" />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setGallery(prev => prev.filter(g => g.image !== item.image));
+                              }}
+                              className="flex-1 py-1.5 bg-theme-bg border border-theme-border rounded text-xs text-red-400 hover:text-red-500 hover:border-red-500 transition-colors flex items-center justify-center gap-1"
+                              title="Delete Image"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2374,33 +2453,52 @@ export default function App() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {[0, 1].map(index => {
-                const imgData = gallery.find(g => g.image === selectedForComparison[index]);
-                if (!imgData) return null;
-                return (
-                  <div key={index} className="flex flex-col gap-4">
-                    <div className="bg-theme-panel rounded-2xl overflow-hidden border border-theme-border">
-                      <img src={imgData.image} alt={`Comparison ${index + 1}`} className="w-full h-auto object-contain max-h-[50vh]" />
-                    </div>
-                    <div className="bg-theme-panel p-4 rounded-xl border border-theme-border flex-1">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs font-bold text-theme-accent uppercase tracking-widest">Image {index + 1}</span>
-                        <span className="text-[10px] text-theme-muted">{imgData.time}</span>
+              {(() => {
+                const img1 = gallery.find(g => g.image === selectedForComparison[0]);
+                const img2 = gallery.find(g => g.image === selectedForComparison[1]);
+                if (!img1 || !img2) return null;
+                
+                const prompt1Parts = img1.prompt.split(',').map(s => s.trim());
+                const prompt2Parts = img2.prompt.split(',').map(s => s.trim());
+                
+                return [img1, img2].map((imgData, index) => {
+                  const currentParts = index === 0 ? prompt1Parts : prompt2Parts;
+                  const otherParts = index === 0 ? prompt2Parts : prompt1Parts;
+                  
+                  return (
+                    <div key={index} className="flex flex-col gap-4">
+                      <div className="bg-theme-panel rounded-2xl overflow-hidden border border-theme-border">
+                        <img src={imgData.image} alt={`Comparison ${index + 1}`} className="w-full h-auto object-contain max-h-[50vh]" />
                       </div>
-                      <p className="text-sm text-theme-text font-mono leading-relaxed">{imgData.prompt}</p>
-                      {imgData.tags && imgData.tags.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-1">
-                          {imgData.tags.map(tag => (
-                            <span key={tag} className="text-[10px] bg-theme-bg border border-theme-border px-2 py-1 rounded text-theme-muted">
-                              <Tag className="w-3 h-3 inline mr-1" /> {tag}
-                            </span>
-                          ))}
+                      <div className="bg-theme-panel p-4 rounded-xl border border-theme-border flex-1 flex flex-col">
+                        <div className="flex justify-between items-center mb-4">
+                          <span className="text-xs font-bold text-theme-accent uppercase tracking-widest">Image {index + 1}</span>
+                          <span className="text-[10px] text-theme-muted">{imgData.time}</span>
                         </div>
-                      )}
+                        <div className="text-sm text-theme-text font-mono leading-relaxed flex flex-wrap gap-1">
+                          {currentParts.map((part, i) => {
+                            const isDiff = !otherParts.includes(part);
+                            return (
+                              <span key={i} className={`${isDiff ? 'bg-theme-accent/20 text-theme-accent font-bold px-1 rounded' : ''}`}>
+                                {part}{i < currentParts.length - 1 ? ',' : ''}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        {imgData.tags && imgData.tags.length > 0 && (
+                          <div className="mt-auto pt-4 flex flex-wrap gap-1">
+                            {imgData.tags.map(tag => (
+                              <span key={tag} className="text-[10px] bg-theme-bg border border-theme-border px-2 py-1 rounded text-theme-muted">
+                                <Tag className="w-3 h-3 inline mr-1" /> {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>
@@ -2680,14 +2778,98 @@ export default function App() {
       )}
 
       {/* LIGHTBOX MODAL */}
-      {zoomedImage && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setZoomedImage(null)}>
-          <button className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors" onClick={() => setZoomedImage(null)}>
-            <X className="w-8 h-8" />
-          </button>
-          <img src={zoomedImage} alt="Zoomed" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={e => e.stopPropagation()} />
-        </div>
-      )}
+      {zoomedImage && (() => {
+        const item = gallery.find(g => g.image === zoomedImage);
+        return (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 md:p-8" onClick={() => setZoomedImage(null)}>
+            <button className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors bg-black/50 p-2 rounded-full z-10" onClick={() => setZoomedImage(null)}>
+              <X className="w-6 h-6" />
+            </button>
+            <div className="flex flex-col md:flex-row gap-6 max-w-7xl w-full h-full max-h-[90vh]" onClick={e => e.stopPropagation()}>
+              <div className="flex-1 flex items-center justify-center min-h-0 relative">
+                <img src={zoomedImage} alt="Zoomed" className="max-w-full max-h-full object-contain rounded-xl shadow-2xl border border-white/10" />
+              </div>
+              {item && (
+                <div className="md:w-[400px] bg-theme-panel/95 border border-theme-border rounded-2xl p-6 flex flex-col gap-6 overflow-y-auto shadow-2xl shrink-0">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold bg-theme-accent/20 text-theme-accent px-3 py-1.5 rounded-full border border-theme-accent/30 uppercase tracking-widest">{item.category || 'Unknown'}</span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setGallery(prev => prev.map(g => g.image === item.image ? { ...g, isFavorite: !g.isFavorite } : g));
+                        }}
+                        className={`p-2 rounded-full transition-colors ${item.isFavorite ? 'bg-red-500/20 text-red-500' : 'bg-theme-bg border border-theme-border text-theme-muted hover:text-red-400'}`}
+                        title="Toggle Favorite"
+                      >
+                        <Heart className={`w-4 h-4 ${item.isFavorite ? 'fill-current' : ''}`} />
+                      </button>
+                      <span className="text-xs text-theme-muted font-mono">{item.time}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <h3 className="text-sm font-bold text-theme-text flex items-center gap-2 uppercase tracking-widest"><AlignLeft className="w-4 h-4 text-theme-accent" /> Prompt</h3>
+                    <div className="bg-theme-bg p-4 rounded-xl border border-theme-border relative group">
+                      <p className="text-sm text-theme-muted font-mono leading-relaxed max-h-48 overflow-y-auto pr-2 custom-scrollbar">{item.prompt}</p>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(item.prompt);
+                          triggerToast();
+                        }}
+                        className="absolute top-2 right-2 p-2 bg-theme-panel border border-theme-border rounded-lg text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-all opacity-0 group-hover:opacity-100"
+                        title="Copier le Prompt"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {item.tags && item.tags.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <h3 className="text-sm font-bold text-theme-text flex items-center gap-2 uppercase tracking-widest"><Tag className="w-4 h-4 text-theme-accent" /> Tags</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {item.tags.map(tag => (
+                          <span key={tag} className="text-xs bg-theme-bg border border-theme-border px-3 py-1.5 rounded-lg text-theme-muted">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-auto pt-6 flex flex-col gap-3 border-t border-theme-border">
+                    <button 
+                      onClick={() => {
+                        setReferenceImage(item.image);
+                        setImg2img(true);
+                        setZoomedImage(null);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="w-full py-3 bg-theme-bg border border-theme-border rounded-xl text-sm font-bold text-theme-text hover:text-theme-accent hover:border-theme-accent transition-all flex items-center justify-center gap-2 group"
+                    >
+                      <Image className="w-4 h-4 group-hover:scale-110 transition-transform" /> Utiliser comme Référence (Img2Img)
+                    </button>
+                    <button 
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = item.image;
+                        link.download = `generated-${item.time.replace(/:/g, '-')}.png`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      className="w-full py-3 bg-theme-accent text-theme-bg rounded-xl text-sm font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-theme-accent/20"
+                    >
+                      <Download className="w-4 h-4" /> Télécharger l'Image
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       <Chatbot />
       <LiveAssistant onTranscript={(text) => setSubject(prev => prev ? prev + ' ' + text : text)} />
