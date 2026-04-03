@@ -26,12 +26,13 @@ export const config: Record<string, any> = {
     ]
   },
   G: { 
-    label: "🩺 Anatomie du corps humain",   
+    label: "💀 Anatomie du corps humain",   
     role: "Scientific Medical Illustrator", 
-    layouts: { G0: "✦ Vue Unique", G1: "Anatomical Cross-section", G2: "Exploded View", G3: "Skeletal Turnaround" },
+    layouts: { G0: "✦ Vue Unique", G1: "Anatomical Cross-section", G2: "Exploded View", G3: "Skeletal Turnaround", G4: "Planche anatomique vintage", G5: "Schéma interactif avec légendes", G6: "Schéma interactif sans légendes" },
     attrs: [
-      { id: "system", label: "Système", type: "select", icon: Activity, options: ["Musculaire", "Squelettique", "Nerveux", "Circulatoire", "Digestif", "Lymphatique"] },
-      { id: "organs", label: "Organe Focus", type: "select", icon: Heart, options: ["Cœur Humain", "Cerveau", "Poumons", "Foie", "Reins", "Yeux", "Estomac"] },
+      { id: "anatomy_subject", label: "Sujet", type: "select", icon: User, options: ["Homme", "Femme", "Enfant", "Animal", "Extraterrestre"] },
+      { id: "system", label: "Système", type: "select", icon: Activity, options: ["Musculaire", "Squelettique", "Nerveux", "Circulatoire", "Digestif", "Lymphatique", "Endocrinien", "Reproducteur", "Respiratoire", "Tégumentaire (Peau)", "Immunitaire", "Urinaire"] },
+      { id: "organs", label: "Organe Focus", type: "select", icon: Heart, options: ["Cœur Humain", "Cerveau", "Poumons", "Foie", "Reins", "Yeux", "Estomac", "Pancréas", "Intestins", "Peau", "Glandes", "Vaisseaux sanguins"] },
       { id: "view_type", label: "Rendu", type: "select", icon: Scan, options: ["Rayons X", "IRM", "Écorché (Muscles)", "Transparence", "Microscopique"] }
     ]
   },
@@ -82,7 +83,7 @@ export const config: Record<string, any> = {
     ] 
   },
   F: { 
-    label: "🏎️ Véhicule",   
+    label: "🚗 Véhicule",   
     role: "Vehicle Designer", 
     layouts: { F0: "✦ Vue Unique", F1: "Blueprint Tech" },
     attrs: [
@@ -139,6 +140,28 @@ export const config: Record<string, any> = {
       { id: "costume_era", label: "Historical Era", type: "select", icon: Hourglass, options: ["Victorian", "Renaissance", "Cyberpunk", "1920s Flapper", "Sci-Fi Future", "Medieval", "Ancient Egyptian"] },
       { id: "costume_material", label: "Primary Material", type: "select", icon: Scissors, options: ["Silk & Lace", "Heavy Leather", "Velvet & Gold", "Holographic Synthetic", "Woven Linen", "Chainmail"] },
       { id: "costume_vibe", label: "Aesthetic/Vibe", type: "select", icon: Sparkles, options: ["Royal / Regal", "Peasant / Commoner", "Tactical / Combat", "Ceremonial", "Nomadic / Wasteland"] }
+    ]
+  },
+  CUL: {
+    label: "🍔 Photographie Culinaire",
+    role: "Expert Food Photographer and Culinary Stylist",
+    layouts: { CUL0: "Plat principal centré", CUL1: "Vue de dessus (Flat lay)", CUL2: "Gros plan texture (Macro)", CUL3: "Scène de table complète", CUL4: "Action (Sauce qui coule, fumée)" },
+    attrs: [
+      { id: "food_type", label: "Type de plat", type: "select", icon: Utensils, options: ["Gastronomique", "Street Food", "Dessert / Pâtisserie", "Boisson / Cocktail", "Plat traditionnel", "Vegan / Healthy", "Fast Food", "Boulangerie"] },
+      { id: "presentation", label: "Dressage", type: "select", icon: ChefHat, options: ["Minimaliste", "Généreux / Rustique", "Déstructuré", "Artistique", "En mouvement (coulure, fumée)", "Symétrique"] },
+      { id: "props", label: "Accessoires de table", type: "select", icon: Box, options: ["Argenterie antique", "Planches en bois brut", "Céramique artisanale", "Nappe en lin", "Feuilles / Herbes fraîches", "Verres en cristal", "Marbre élégant"] },
+      { id: "food_lighting", label: "Éclairage culinaire", type: "select", icon: Lightbulb, options: ["Lumière naturelle douce", "Clair-obscur (Dark mood)", "Studio brillant (High key)", "Lumière directionnelle dure", "Néon / Ambiance bar"] }
+    ]
+  },
+  FASH: {
+    label: "👠 Mode & Fashion",
+    role: "High-End Fashion Photographer and Stylist",
+    layouts: { FASH0: "Lookbook (Plein pied)", FASH1: "Portrait Éditorial", FASH2: "Détail vêtement/texture", FASH3: "Défilé (Runway)", FASH4: "Campagne publicitaire" },
+    attrs: [
+      { id: "fashion_style", label: "Style vestimentaire", type: "select", icon: Shirt, options: ["Haute Couture", "Streetwear", "Avant-Garde", "Vintage / Rétro", "Minimaliste", "Techwear", "Éco-responsable", "Androgyne", "Y2K"] },
+      { id: "fabric", label: "Tissu / Matière", type: "select", icon: Layers, options: ["Soie / Satin", "Cuir / Vinyle", "Denim brut", "Laine / Tricot", "Dentelle / Transparence", "Matières synthétiques / Plastique", "Velours", "Lin naturel"] },
+      { id: "pose", label: "Pose du mannequin", type: "select", icon: User, options: ["Dynamique / En mouvement", "Statique / Éditoriale", "Assise élégante", "Regard par-dessus l'épaule", "Interaction avec le vêtement", "Pose asymétrique"] },
+      { id: "fashion_setting", label: "Décor / Set", type: "select", icon: Building, options: ["Studio fond uni", "Rue urbaine", "Nature sauvage", "Architecture brutaliste", "Intérieur luxueux", "Décor surréaliste"] }
     ]
   },
   M: {
@@ -208,10 +231,13 @@ export const angles = [
   { id: "back", label: "Dos", value: "back view 180°" },
   { id: "perspective", label: "3/4", value: "3/4 perspective view" },
   { id: "top_down", label: "Haut", value: "top down view 90°" },
+  { id: "zenith", label: "Zénithale (Flat Lay)", value: "zenithal overhead flat lay view, 90 degrees looking down" },
   { id: "high_view", label: "Ciel", value: "cinematic bird's eye view" },
   { id: "low", label: "Contre-plongée", value: "heroic low angle" },
+  { id: "dramatic_low", label: "Contre-plongée Dramatique", value: "dramatic extreme low angle shot, worm's-eye view" },
   { id: "closeup", label: "Macro", value: "extreme close-up" },
-  { id: "wide", label: "Large", value: "wide establishing shot" }
+  { id: "wide", label: "Large", value: "wide establishing shot" },
+  { id: "dutch", label: "Plan Hollandais", value: "dutch angle, tilted camera" }
 ];
 
 export const stylesData: Record<string, string> = { 

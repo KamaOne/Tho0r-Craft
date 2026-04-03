@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag, Menu, Search, User, Activity, Ghost, Box, Building, Trees, Car, PenTool, Zap, Brain, Shirt, Clapperboard, Sword, Layout } from 'lucide-react';
+import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag, Menu, Search, User, Activity, Ghost, Box, Building, Trees, Car, PenTool, Zap, Brain, Shirt, Clapperboard, Sword, Layout, Skull, PawPrint, Home, Utensils, Bookmark } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import ReactCrop, { type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -89,6 +89,13 @@ export default function App() {
   const [customNegPrompt, setCustomNegPrompt] = useState('worst quality, low quality, normal quality, watermark, signature, text, blurry, deformed, ugly, bad anatomy, extra fingers, mutated hands, cropped, bad proportions, disfigured face, asymmetric eyes');
   const [seed, setSeed] = useState<number | null>(null);
   const [temperature, setTemperature] = useState<number>(0.5);
+
+  const [categorySearch, setCategorySearch] = useState('');
+  const [savedPrompts, setSavedPrompts] = useState<{id: string, text: string, date: number}[]>(() => {
+    const saved = localStorage.getItem('tho0r_saved_prompts');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [showSavedModal, setShowSavedModal] = useState(false);
 
   const [generatedPrompt, setGeneratedPrompt] = useState('');
   
@@ -328,6 +335,10 @@ export default function App() {
     saveGallery(gallery);
   }, [gallery]);
 
+  useEffect(() => {
+    localStorage.setItem('tho0r_saved_prompts', JSON.stringify(savedPrompts));
+  }, [savedPrompts]);
+
   // Update layout when category changes
   useEffect(() => {
     const layouts = Object.keys(config[category].layouts);
@@ -436,6 +447,18 @@ export default function App() {
     } catch (err) {
       console.error("Failed to copy", err);
     }
+  };
+
+  const handleSavePrompt = () => {
+    if (!generatedPrompt.trim()) return;
+    const newSaved = {
+      id: Date.now().toString(),
+      text: generatedPrompt,
+      date: Date.now()
+    };
+    setSavedPrompts(prev => [newSaved, ...prev]);
+    // Optionally we could have a different toast message, but for now we'll just trigger the existing one or a simple alert
+    alert("Prompt sauvegardé !");
   };
 
   const handleGenerateImage = async () => {
@@ -1008,26 +1031,43 @@ export default function App() {
         
         {!isSidebarCollapsed && (
           <div className="flex flex-col gap-2 flex-grow mt-4 animate-in fade-in duration-300">
-            <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted mb-2">Categories</label>
-            {Object.entries(config).map(([k, v]) => {
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-theme-muted">Categories</label>
+            </div>
+            <div className="relative mb-2">
+              <Search className="w-3 h-3 absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted" />
+              <input
+                type="text"
+                placeholder="Rechercher..."
+                value={categorySearch}
+                onChange={(e) => setCategorySearch(e.target.value)}
+                className="w-full bg-theme-bg border border-theme-border rounded-lg pl-8 pr-3 py-2 text-xs text-theme-text focus:outline-none focus:border-theme-accent transition-colors"
+              />
+            </div>
+            <div className="flex flex-col gap-2 overflow-y-auto pr-1 pb-4" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            {Object.entries(config)
+              .filter(([_, v]) => v.label.toLowerCase().includes(categorySearch.toLowerCase()))
+              .map(([k, v]) => {
               const getCategoryIcon = (key: string) => {
                 switch(key) {
                   case 'A': return <User className="w-4 h-4" />;
-                  case 'B': return <Activity className="w-4 h-4" />;
-                  case 'C': return <Ghost className="w-4 h-4" />;
-                  case 'D': return <Box className="w-4 h-4" />;
-                  case 'E': return <Building className="w-4 h-4" />;
-                  case 'F': return <Trees className="w-4 h-4" />;
-                  case 'G': return <Car className="w-4 h-4" />;
-                  case 'H': return <PenTool className="w-4 h-4" />;
-                  case 'I': return <Ghost className="w-4 h-4" />;
-                  case 'J': return <Zap className="w-4 h-4" />;
-                  case 'K': return <Brain className="w-4 h-4" />;
-                  case 'L': return <Shirt className="w-4 h-4" />;
+                  case 'B': return <PawPrint className="w-4 h-4" />;
+                  case 'C': return <Box className="w-4 h-4" />;
+                  case 'D': return <Building className="w-4 h-4" />;
+                  case 'INT': return <Home className="w-4 h-4" />;
+                  case 'E': return <Trees className="w-4 h-4" />;
+                  case 'F': return <Car className="w-4 h-4" />;
+                  case 'G': return <Skull className="w-4 h-4" />;
+                  case 'H': return <Ghost className="w-4 h-4" />;
+                  case 'I': return <Zap className="w-4 h-4" />;
+                  case 'J': return <Brain className="w-4 h-4" />;
+                  case 'K': return <Shirt className="w-4 h-4" />;
+                  case 'CUL': return <Utensils className="w-4 h-4" />;
+                  case 'FASH': return <Shirt className="w-4 h-4" />;
                   case 'M': return <Clapperboard className="w-4 h-4" />;
                   case 'N': return <Sword className="w-4 h-4" />;
                   case 'O': return <Box className="w-4 h-4" />;
-                  case 'P': return <Layout className="w-4 h-4" />;
+                  case 'P': return <PenTool className="w-4 h-4" />;
                   case 'Q': return <Video className="w-4 h-4" />;
                   case 'R': return <Video className="w-4 h-4" />;
                   default: return <Layers className="w-4 h-4" />;
@@ -1048,6 +1088,7 @@ export default function App() {
                 </button>
               );
             })}
+            </div>
           </div>
         )}
       </aside>
@@ -1079,6 +1120,18 @@ export default function App() {
               title="Redo (Ctrl+Y)"
             >
               <Redo className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setShowSavedModal(true)}
+              className="text-xs font-bold text-theme-accent border border-theme-border hover:bg-theme-accent/10 px-3 py-2 rounded-full transition-all flex items-center justify-center relative"
+              title="Prompts Sauvegardés"
+            >
+              <Bookmark className="w-4 h-4" />
+              {savedPrompts.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-theme-accent text-theme-bg text-[8px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                  {savedPrompts.length}
+                </span>
+              )}
             </button>
             <ThemeSettings 
               isNarratorActive={isNarratorActive}
@@ -1257,9 +1310,9 @@ export default function App() {
                             case 'front': return <Eye className="w-3 h-3" />;
                             case 'profile_l': case 'profile_r': return <Scan className="w-3 h-3" />;
                             case 'back': return <Camera className="w-3 h-3" />;
-                            case 'perspective': return <Video className="w-3 h-3" />;
-                            case 'top_down': case 'high_view': return <Aperture className="w-3 h-3" />;
-                            case 'low': return <Focus className="w-3 h-3" />;
+                            case 'perspective': case 'dutch': return <Video className="w-3 h-3" />;
+                            case 'top_down': case 'high_view': case 'zenith': return <Aperture className="w-3 h-3" />;
+                            case 'low': case 'dramatic_low': return <Focus className="w-3 h-3" />;
                             case 'closeup': return <Crosshair className="w-3 h-3" />;
                             case 'wide': return <Maximize2 className="w-3 h-3" />;
                             default: return <Camera className="w-3 h-3" />;
@@ -1763,6 +1816,9 @@ export default function App() {
                   <button onClick={handleGenerateImage} disabled={isGeneratingImage} className="bg-theme-panel border border-theme-border hover:border-theme-accent text-theme-text px-4 py-2 rounded-full font-black text-xs tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2 disabled:opacity-50" title="Generate Image (Shift+Enter)">
                     {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />} GENERATE
                   </button>
+                  <button onClick={handleSavePrompt} className="bg-theme-panel border border-theme-border hover:border-theme-accent text-theme-text px-4 py-2 rounded-full font-black text-xs tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2" title="Sauvegarder le prompt">
+                    <Bookmark className="w-4 h-4" />
+                  </button>
                   <button onClick={handleCopy} className="bg-theme-accent hover:opacity-80 text-theme-bg px-6 py-2 rounded-full font-black text-xs tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2">
                     <Copy className="w-4 h-4" /> COPY PROMPT
                   </button>
@@ -2161,6 +2217,51 @@ export default function App() {
       {showToast && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-theme-accent text-theme-bg px-6 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-5">
           <Copy className="w-4 h-4" /> SCRIPT COPIED SUCCESSFULLY!
+        </div>
+      )}
+
+      {/* SAVED PROMPTS MODAL */}
+      {showSavedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowSavedModal(false)}>
+          <div className="bg-theme-bg border border-theme-border rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-theme-border flex justify-between items-center">
+              <h2 className="text-lg font-bold flex items-center gap-2 text-theme-text"><Bookmark className="w-5 h-5 text-theme-accent"/> Prompts Sauvegardés</h2>
+              <button onClick={() => setShowSavedModal(false)} className="p-1 hover:bg-theme-accent/10 rounded-lg text-theme-muted hover:text-theme-text">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-grow flex flex-col gap-3">
+              {savedPrompts.length === 0 ? (
+                <p className="text-theme-muted text-center py-8">Aucun prompt sauvegardé pour le moment.</p>
+              ) : (
+                savedPrompts.map(p => (
+                  <div key={p.id} className="p-3 border border-theme-border rounded-xl bg-theme-panel flex flex-col gap-2 relative group hover:border-theme-accent transition-colors">
+                    <p className="text-sm text-theme-text pr-16">{p.text}</p>
+                    <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => { 
+                          navigator.clipboard.writeText(p.text); 
+                          triggerToast(); 
+                        }} 
+                        className="p-1.5 bg-theme-bg border border-theme-border rounded-md hover:text-theme-accent hover:border-theme-accent transition-colors"
+                        title="Copier"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                      <button 
+                        onClick={() => setSavedPrompts(prev => prev.filter(s => s.id !== p.id))} 
+                        className="p-1.5 bg-theme-bg border border-theme-border rounded-md hover:text-red-500 hover:border-red-500 transition-colors"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <span className="text-[10px] text-theme-muted">{new Date(p.date).toLocaleString()}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
 
