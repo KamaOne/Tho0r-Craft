@@ -3,7 +3,7 @@ import {
   Heart, Scan, Layers, Trees, Flame, Box, Building, Hammer, Sun, Car, Wrench, Map,
   Mountain, CloudRain, Clock, Utensils, ChefHat, Lightbulb, Microscope, ZoomIn, Zap,
   Brain, Hexagon, Hourglass, Sparkles, Clapperboard, Maximize, Sword, ShieldAlert,
-  Gem, Triangle, Image as ImageIcon, PenTool, Layout, Ghost, Paintbrush
+  Gem, Triangle, Image as ImageIcon, PenTool, Layout, Ghost, Paintbrush, Home, Sofa
 } from 'lucide-react';
 
 export const config: Record<string, any> = {
@@ -19,8 +19,9 @@ export const config: Record<string, any> = {
       { id: "eyes", label: "Yeux", type: "select", icon: Eye, options: ["Bleu perçant", "Vert émeraude", "Brun profond", "Noisette", "Gris acier", "Optique cybernétique"] },
       { id: "hair_style", label: "Coiffure", type: "select", icon: Scissors, options: ["Dreadlocks longs", "Locs bohème", "Crête iroquoise", "Pixie désordonné", "Longs et lisses", "Coupe militaire", "Chauve"] },
       { id: "hair_color", label: "Couleur Cheveux", type: "select", icon: PaintBucket, options: ["Blond", "Blond vénitien", "Noir", "Brun", "Roux", "Auburn", "Néon Bleu", "Rose Pastel"] },
-      { id: "clothing", label: "Vêtements", type: "select", icon: Shirt, options: ["Toge", "Tenue antique", "Tenue médiévale", "Armure tactique", "Streetwear oversize", "Tunique cuir médiévale", "Costume victorien", "Techwear Cyberpunk", "Combinaison spatiale", "Costume cravate", "Robe de soirée", "Tenue de sport", "Uniforme", "Tenue décontractée", "Haute couture"] },
-      { id: "shoes", label: "Chaussures", type: "select", icon: Footprints, options: ["Baskets", "Tongs", "Dr. Martens", "Bottes en cuir", "Talons hauts", "Mocassins", "Chaussures de ville", "Bottes de combat", "Pieds nus"] },
+      { id: "clothing", label: "Vêtements", type: "select", icon: Shirt, options: ["Toge", "Tenue antique", "Tunique égyptienne antique", "Tenue de gladiateur", "Tenue médiévale", "Tunique cuir médiévale", "Robe à la française (18ème siècle)", "Costume victorien", "Corset époque victorienne", "Robe Empire", "Costume 3 pièces rétro", "Kimono traditionnel", "Armure tactique", "Streetwear oversize", "Techwear Cyberpunk", "Combinaison spatiale", "Costume cravate", "Robe de soirée", "Tenue de sport", "Uniforme", "Tenue décontractée", "Haute couture"] },
+      { id: "shoes", label: "Chaussures", type: "select", icon: Footprints, options: ["Baskets", "Tongs", "Dr. Martens", "Bottes en cuir", "Talons hauts", "Mocassins", "Chaussures de ville", "Bottes de combat", "Sandales spartiates", "Poulaines médiévales", "Bottines victoriennes à lacets", "Chaussures Richelieu vintage", "Sabots en bois", "Escarpins rétro 1920", "Pieds nus"] },
+      { id: "accessories", label: "Accessoires", type: "select", icon: Gem, options: ["Aucun", "Boucles d'oreilles en perles", "Montre à gousset", "Collier victorien", "Lunettes d'aviateur vintage", "Couronne de lauriers", "Gants en dentelle", "Chapeau haut-de-forme", "Éventail en soie", "Broche camée", "Lunettes rondes rétro", "Bague chevalière"] },
       { id: "skin_material", label: "Skin Material", type: "select", icon: Paintbrush, options: ["Pristine", "Weathered", "Cybernetic", "Ethereal", "Scratched", "Scaled", "Metallic sheen", "Glows faintly"] }
     ]
   },
@@ -58,6 +59,18 @@ export const config: Record<string, any> = {
       { id: "arch_mat", label: "Matériaux", type: "select", icon: Hammer, options: ["Béton brut", "Brique rouge", "Verre/Acier", "Bois", "Marbre"] }, 
       { id: "arch_style", label: "Style", type: "select", icon: Building, options: ["Minimaliste", "Gothique", "Victorien", "Industriel", "Cyberpunk", "Zen"] }
     ] 
+  },
+  INT: {
+    label: "🛋️ Design d'Intérieur",
+    role: "Expert Interior Designer and Architectural Visualizer",
+    layouts: { INT0: "Vue d'ensemble", INT1: "Détail Mobilier", INT2: "Plan au sol", INT3: "Vue Isométrique", INT4: "Vue depuis la porte", INT5: "Vue en plongée sur le mobilier", INT6: "Rendu 360°" },
+    attrs: [
+      { id: "room_type", label: "Type de pièce", type: "select", icon: Home, options: ["Salon", "Cuisine", "Salle de bain", "Chambre à coucher", "Bureau", "Bibliothèque", "Véranda", "Hall d'entrée", "Loft", "Chambre d'hôpital"] },
+      { id: "interior_style", label: "Style décoratif", type: "select", icon: Palette, options: ["Moderne", "Minimaliste", "Industriel", "Bohème", "Scandinave", "Art Déco", "Classique", "Rustique", "Mid-Century Modern", "Cyberpunk", "Victorien", "Japandi"] },
+      { id: "furniture_era", label: "Époque du mobilier", type: "select", icon: Hourglass, options: ["Contemporain", "Années 70", "Années 50", "Antique", "Renaissance", "Futuriste", "Médiéval"] },
+      { id: "color_scheme", label: "Palette de couleurs", type: "select", icon: PaintBucket, options: ["Tons neutres", "Couleurs chaudes", "Couleurs froides", "Pastel", "Contrasté", "Monochrome", "Tons terreux", "Néon"] },
+      { id: "material_focus", label: "Matériaux dominants", type: "select", icon: Box, options: ["Bois naturel", "Marbre et pierre", "Métal et verre", "Velours et tissus riches", "Béton brut", "Bambou et rotin", "Plastique et chrome"] }
+    ]
   },
   E: { 
     label: "🌲 Paysage", 
@@ -225,7 +238,13 @@ export const stylesData: Record<string, string> = {
   S21: "Vaporwave",
   S22: "Art Déco",
   S23: "Impressionnisme Abstrait",
-  S24: "Gravure sur Bois (Woodcut)"
+  S24: "Gravure sur Bois (Woodcut)",
+  S25: "Renaissance",
+  S26: "Baroque",
+  S27: "Rococo",
+  S28: "Art Déco (Vintage)",
+  S29: "Polaroid",
+  S30: "Cinématique 35mm"
 };
 
 export const stylesValue: Record<string, string> = { 
@@ -252,7 +271,13 @@ export const stylesValue: Record<string, string> = {
   S21: "vaporwave aesthetic, pastel colors, glitch art, retro 90s, surreal",
   S22: "art deco, geometric shapes, gold and black, luxurious, 1920s style",
   S23: "abstract expressionism, Jackson Pollock style, chaotic paint splatters, emotional",
-  S24: "woodcut print, bold black and white lines, rough texture, medieval style"
+  S24: "woodcut print, bold black and white lines, rough texture, medieval style",
+  S25: "Renaissance painting style, oil on canvas, chiaroscuro, masterpiece",
+  S26: "Baroque art style, dramatic lighting, rich colors, highly detailed, ornate",
+  S27: "Rococo art style, pastel colors, ornate, elegant, soft lighting, romantic",
+  S28: "Vintage Art Deco poster style, geometric, elegant, symmetrical",
+  S29: "Polaroid photo, vintage photography, soft focus, retro colors, light leaks",
+  S30: "35mm film photography, cinematic lighting, film grain, anamorphic lens"
 };
 
 export const lightsData: Record<string, string> = { E1: "Sans Ombres", E2: "Studio", E3: "Dramatique", E4: "Naturel", E5: "Chaud", E6: "Froid" };
@@ -265,7 +290,8 @@ export const bgsData: Record<string, string> = {
   F14: "Désert", F15: "Océan", F16: "Montagnes", F17: "Ville Cyberpunk", F18: "Village Médiéval", 
   F19: "Station Spatiale", F20: "Sous-marin", F21: "Ville en Ruines",
   F22: "Dégradé Abstrait", F23: "Motifs Géométriques", F24: "Lumières Bokeh", F25: "Grille Néon", 
-  F26: "Tourbillons Liquides", F27: "Formes Minimalistes", F28: "Abstract Geometric Patterns", F29: "Abstract"
+  F26: "Tourbillons Liquides", F27: "Formes Minimalistes", F28: "Abstract Geometric Patterns", F29: "Abstract",
+  F30: "Salle de bain", F31: "Cuisine", F32: "Chambre d'hôpital", F33: "Salon"
 };
 export const bgsValue: Record<string, string> = { 
   F1: "pure white background", F2: "green screen", F3: "grey background", F4: "black background", 
@@ -274,5 +300,6 @@ export const bgsValue: Record<string, string> = {
   F14: "desert landscape with dunes", F15: "vast ocean view", F16: "snowy mountain peaks", F17: "neon-lit cyberpunk city street", F18: "medieval fantasy village", 
   F19: "futuristic space station interior", F20: "underwater coral reef", F21: "post-apocalyptic ruined city",
   F22: "smooth abstract color gradient background", F23: "abstract geometric patterns background", F24: "soft bokeh lights background", F25: "retro 80s neon grid background", 
-  F26: "abstract liquid swirls background", F27: "minimalist abstract shapes background", F28: "abstract geometric patterns background", F29: "abstract background"
+  F26: "abstract liquid swirls background", F27: "minimalist abstract shapes background", F28: "abstract geometric patterns background", F29: "abstract background",
+  F30: "bathroom interior, modern bathroom, tiles, mirror", F31: "kitchen interior, modern kitchen, countertops, appliances", F32: "hospital room interior, medical equipment, clinical lighting", F33: "living room interior, cozy sofa, coffee table, warm lighting"
 };
