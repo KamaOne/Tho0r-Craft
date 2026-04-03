@@ -27,6 +27,7 @@ interface AppState {
   referenceImage: string | null;
   img2imgStrength: number;
   customNegPrompt: string;
+  customTags: string[];
   seed: number | null;
   temperature: number;
   generatedPrompt: string;
@@ -44,6 +45,15 @@ interface Preset {
   w: string;
   angles: string[];
   attrs: Record<string, string>;
+  customTags?: string[];
+  lens?: string;
+  aspect?: string;
+  img2img?: boolean;
+  referenceImage?: string | null;
+  img2imgStrength?: number;
+  customNegPrompt?: string;
+  seed?: number | null;
+  temperature?: number;
 }
 
 const PREDEFINED_SUBJECTS = [
@@ -87,6 +97,8 @@ export default function App() {
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [img2imgStrength, setImg2imgStrength] = useState<number>(50);
   const [customNegPrompt, setCustomNegPrompt] = useState('worst quality, low quality, normal quality, watermark, signature, text, blurry, deformed, ugly, bad anatomy, extra fingers, mutated hands, cropped, bad proportions, disfigured face, asymmetric eyes');
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const [customTagInput, setCustomTagInput] = useState('');
   const [seed, setSeed] = useState<number | null>(null);
   const [temperature, setTemperature] = useState<number>(0.5);
 
@@ -156,7 +168,7 @@ export default function App() {
   const isRestoringRef = useRef(false);
 
   const currentState: AppState = {
-    category, layout, subject, style, lighting, background, sliderS, sliderC, sliderW, selectedAngles, attributes, lens, aspect, img2img, referenceImage, img2imgStrength, customNegPrompt, seed, temperature, generatedPrompt
+    category, layout, subject, style, lighting, background, sliderS, sliderC, sliderW, selectedAngles, attributes, lens, aspect, img2img, referenceImage, img2imgStrength, customNegPrompt, customTags, seed, temperature, generatedPrompt
   };
 
   useEffect(() => {
@@ -196,6 +208,7 @@ export default function App() {
     setReferenceImage(state.referenceImage);
     setImg2imgStrength(state.img2imgStrength);
     setCustomNegPrompt(state.customNegPrompt);
+    setCustomTags(state.customTags || []);
     setSeed(state.seed);
     setTemperature(state.temperature);
     setGeneratedPrompt(state.generatedPrompt);
@@ -354,7 +367,7 @@ export default function App() {
   // Generate prompt whenever inputs change
   useEffect(() => {
     generatePrompt();
-  }, [category, layout, subject, style, lighting, background, sliderS, sliderC, sliderW, selectedAngles, attributes, lens, aspect, img2img, img2imgStrength, referenceImage, customNegPrompt, isRotationEnabled]);
+  }, [category, layout, subject, style, lighting, background, sliderS, sliderC, sliderW, selectedAngles, attributes, lens, aspect, img2img, img2imgStrength, referenceImage, customNegPrompt, customTags, isRotationEnabled]);
 
   const generatePrompt = () => {
     const catConfig = config[category];
@@ -396,6 +409,7 @@ export default function App() {
     }
     if (aspect) prompt += ` ${aspect}`;
     if (customNegPrompt.trim()) prompt += ` --no ${customNegPrompt.trim()}`;
+    if (customTags.length > 0) prompt += ` ${customTags.join(' ')}`;
     
     setGeneratedPrompt(prompt);
   };
@@ -933,7 +947,16 @@ export default function App() {
         c: sliderC,
         w: sliderW,
         angles: selectedAngles,
-        attrs: attributes
+        attrs: attributes,
+        customTags,
+        lens,
+        aspect,
+        img2img,
+        referenceImage,
+        img2imgStrength,
+        customNegPrompt,
+        seed,
+        temperature
       }
     };
     setPresets(newPresets);
@@ -955,6 +978,15 @@ export default function App() {
     setSliderW(p.w || '0');
     setSelectedAngles(p.angles || []);
     setAttributes(p.attrs || {});
+    setCustomTags(p.customTags || []);
+    setLens(p.lens || '');
+    setAspect(p.aspect || '');
+    setImg2img(p.img2img || false);
+    setReferenceImage(p.referenceImage || null);
+    setImg2imgStrength(p.img2imgStrength || 50);
+    setCustomNegPrompt(p.customNegPrompt || 'worst quality, low quality, normal quality, watermark, signature, text, blurry, deformed, ugly, bad anatomy, extra fingers, mutated hands, cropped, bad proportions, disfigured face, asymmetric eyes');
+    setSeed(p.seed || null);
+    setTemperature(p.temperature || 0.5);
   };
 
   const confirmDeletePreset = (name: string) => {
@@ -1779,6 +1811,66 @@ export default function App() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* CUSTOM TAGS */}
+              <div className="bg-theme-panel p-6 rounded-2xl border border-theme-border flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-bold flex items-center gap-2 text-theme-text uppercase tracking-widest">
+                    <Tag className="w-4 h-4 text-theme-accent" /> Tags Personnalisés
+                  </h3>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setCustomTags([])}
+                      className="text-[10px] bg-theme-panel border border-theme-border hover:border-red-500/50 hover:text-red-400 px-2 py-1 rounded-full text-theme-text transition-colors flex items-center justify-center"
+                      title="Clear all tags"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {customTags.map((tag, idx) => (
+                    <div key={idx} className="flex items-center gap-1 bg-theme-accent/20 border border-theme-accent/50 text-theme-accent px-3 py-1 rounded-full text-xs">
+                      <span>{tag}</span>
+                      <button 
+                        onClick={() => setCustomTags(prev => prev.filter((_, i) => i !== idx))}
+                        className="hover:text-red-400 transition-colors ml-1"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input 
+                    type="text"
+                    value={customTagInput}
+                    onChange={(e) => setCustomTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && customTagInput.trim()) {
+                        e.preventDefault();
+                        if (!customTags.includes(customTagInput.trim())) {
+                          setCustomTags(prev => [...prev, customTagInput.trim()]);
+                        }
+                        setCustomTagInput('');
+                      }
+                    }}
+                    className="flex-1 p-3 rounded-xl bg-theme-bg border border-theme-border text-theme-text focus:border-theme-accent focus:ring-1 focus:ring-theme-accent outline-none transition-all text-sm" 
+                    placeholder="Ex: --ar 16:9, 8k, chef-d'œuvre (Appuyez sur Entrée)"
+                  />
+                  <button
+                    onClick={() => {
+                      if (customTagInput.trim() && !customTags.includes(customTagInput.trim())) {
+                        setCustomTags(prev => [...prev, customTagInput.trim()]);
+                        setCustomTagInput('');
+                      }
+                    }}
+                    className="bg-theme-accent text-theme-bg px-4 rounded-xl font-bold hover:opacity-80 transition-opacity"
+                  >
+                    Ajouter
+                  </button>
+                </div>
               </div>
 
             </div>
