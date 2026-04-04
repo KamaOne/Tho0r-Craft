@@ -12,6 +12,7 @@ service cloud.firestore {
     //   - uid: string (required, immutable) - The user's ID
     //   - email: string (required, immutable) - The user's email
     //   - tokens: number (required) - The user's token balance
+    //   - lastRefillDate: timestamp (required) - Last time tokens were refilled
     //   - createdAt: timestamp (required, immutable) - Creation time
     //
     // ===============================================================
@@ -45,11 +46,23 @@ service cloud.firestore {
     }
     
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'tokens', 'createdAt']) &&
+      return hasOnlyAllowedFields(['uid', 'email', 'tokens', 'lastRefillDate', 'createdAt']) &&
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
              data.email is string && isValidEmail(data.email) && data.email.size() < 150 &&
              data.tokens is number && data.tokens >= 0 &&
+             data.lastRefillDate is timestamp &&
              data.createdAt is timestamp;
+    }
+    
+    function isWeeklyRefill() {
+      return request.resource.data.tokens == 200 &&
+             request.resource.data.lastRefillDate == request.time &&
+             (!('lastRefillDate' in resource.data) || request.time >= resource.data.lastRefillDate + duration.value(7, 'd'));
+    }
+    
+    function isTokenSpend() {
+      return request.resource.data.tokens <= resource.data.tokens &&
+             (!('lastRefillDate' in resource.data) ? request.resource.data.lastRefillDate == request.time : request.resource.data.lastRefillDate == resource.data.lastRefillDate);
     }
 
     match /users/{userId} {
@@ -60,15 +73,16 @@ service cloud.firestore {
                        isValidUser(request.resource.data) && 
                        uidUnchanged() &&
                        request.resource.data.tokens == 200 &&
+                       request.resource.data.lastRefillDate == request.time &&
                        request.resource.data.createdAt == request.time;
                        
-      // Allow update: tokens can only decrease, immutable fields cannot change
+      // Allow update: tokens can only decrease OR it's a valid weekly refill
       allow update: if isOwner(userId) && 
                        isValidUser(request.resource.data) && 
                        uidNotModified() &&
                        request.resource.data.email == resource.data.email &&
                        request.resource.data.createdAt == resource.data.createdAt &&
-                       request.resource.data.tokens <= resource.data.tokens;
+                       (isTokenSpend() || isWeeklyRefill());
     }
   }
 }

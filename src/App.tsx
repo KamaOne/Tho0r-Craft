@@ -188,6 +188,8 @@ export default function App() {
   
   const [showToast, setShowToast] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [showOutOfTokensModal, setShowOutOfTokensModal] = useState(false);
+  const [lastRefillDate, setLastRefillDate] = useState<Date | null>(null);
   const [showLegal, setShowLegal] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -230,8 +232,29 @@ export default function App() {
               uid: currentUser.uid,
               email: currentUser.email,
               tokens: 200,
+              lastRefillDate: serverTimestamp(),
               createdAt: serverTimestamp()
             });
+          } else {
+            const data = docSnap.data();
+            if (data.lastRefillDate) {
+              const lastRefill = data.lastRefillDate.toDate();
+              const now = new Date();
+              const diffTime = Math.abs(now.getTime() - lastRefill.getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+              
+              if (diffDays >= 7 && data.tokens < 200) {
+                await updateDoc(userRef, {
+                  tokens: 200,
+                  lastRefillDate: serverTimestamp()
+                });
+              }
+            } else {
+              // Migration for users created before lastRefillDate was added
+              await updateDoc(userRef, {
+                lastRefillDate: serverTimestamp()
+              });
+            }
           }
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
@@ -251,6 +274,9 @@ export default function App() {
           if (data.tokens !== undefined) {
             setTokens(data.tokens);
             localStorage.setItem('tho0r_tokens', data.tokens.toString());
+          }
+          if (data.lastRefillDate) {
+            setLastRefillDate(data.lastRefillDate.toDate());
           }
         }
       }, (error) => {
@@ -766,15 +792,8 @@ export default function App() {
       return true;
     }
     
-    // Not enough tokens, trigger BYOK
-    // @ts-ignore
-    if (typeof window !== 'undefined' && window.aistudio && window.aistudio.openSelectKey) {
-      // @ts-ignore
-      await window.aistudio.openSelectKey();
-      return true; // Assume they entered a key and we can proceed using their billing
-    }
-    
-    alert("Pas assez de tokens. Veuillez lier votre propre clé API Google Cloud.");
+    // Not enough tokens, trigger BYOK modal
+    setShowOutOfTokensModal(true);
     return false;
   };
 
@@ -1555,23 +1574,6 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {user ? (
-              <div className="flex items-center gap-2">
-                {user.photoURL && <img src={user.photoURL} alt="Profile" className="w-6 h-6 rounded-full border border-theme-border" />}
-                <button onClick={handleLogout} className="text-xs font-bold text-theme-muted hover:text-theme-accent transition-colors flex items-center gap-1" title="Se déconnecter">
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <button onClick={handleLogin} className="text-xs font-bold text-theme-muted hover:text-theme-accent transition-colors flex items-center gap-1" title="Se connecter pour sauvegarder les tokens">
-                <LogIn className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">LOGIN</span>
-              </button>
-            )}
-            <div className="flex items-center gap-1.5 bg-theme-bg px-3 py-1.5 rounded-full border border-theme-border" title="Tokens restants">
-              <Zap className="w-3.5 h-3.5 text-theme-accent" />
-              <span className="text-xs font-bold text-theme-accent">{tokens}</span>
-            </div>
             <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="text-theme-muted hover:text-theme-text transition-colors p-1 rounded-lg hover:bg-theme-accent/10">
               <Menu className="w-5 h-5" />
             </button>
@@ -1654,6 +1656,23 @@ export default function App() {
         <div className="max-w-6xl mx-auto">
           <header className="mb-8 flex flex-col md:flex-row items-center justify-end gap-6 relative">
             <div className="flex items-center gap-2 flex-wrap justify-center md:justify-end">
+            {user ? (
+              <div className="flex items-center gap-2 mr-2">
+                {user.photoURL && <img src={user.photoURL} alt="Profile" className="w-6 h-6 rounded-full border border-theme-border" />}
+                <button onClick={handleLogout} className="text-xs font-bold text-theme-muted hover:text-theme-accent transition-colors flex items-center gap-1" title="Se déconnecter">
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button onClick={handleLogin} className="text-xs font-bold text-theme-muted hover:text-theme-accent transition-colors flex items-center gap-1 mr-2" title="Se connecter pour sauvegarder les tokens">
+                <LogIn className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">LOGIN</span>
+              </button>
+            )}
+            <div className="flex items-center gap-1.5 bg-theme-bg px-3 py-1.5 rounded-full border border-theme-border mr-2" title="Tokens restants">
+              <Zap className="w-3.5 h-3.5 text-theme-accent" />
+              <span className="text-xs font-bold text-theme-accent">{tokens}</span>
+            </div>
             <button 
               onClick={handleUndo} 
               disabled={!canUndo}
@@ -3209,6 +3228,59 @@ export default function App() {
         </div>
       )}
 
+      {/* OUT OF TOKENS MODAL */}
+      {showOutOfTokensModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowOutOfTokensModal(false)}>
+          <div className="bg-theme-panel border border-theme-border rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-theme-accent flex items-center gap-2">
+                <Zap className="w-6 h-6" /> Plus de Tokens !
+              </h3>
+              <button onClick={() => setShowOutOfTokensModal(false)} className="text-theme-muted hover:text-theme-text">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-theme-muted mb-4">
+              Vous avez épuisé vos tokens gratuits. 
+            </p>
+            {user ? (
+              <div className="bg-theme-bg p-4 rounded-lg border border-theme-border mb-4">
+                <p className="text-sm text-theme-text">
+                  Vos 200 tokens gratuits seront rechargés le <strong>{lastRefillDate ? new Date(lastRefillDate.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString() : 'bientôt'}</strong>.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-theme-bg p-4 rounded-lg border border-theme-border mb-4">
+                <p className="text-sm text-theme-text mb-2">
+                  Connectez-vous avec Google pour bénéficier de la recharge hebdomadaire de 200 tokens !
+                </p>
+                <button onClick={handleLogin} className="w-full bg-theme-accent text-theme-bg py-2 rounded-lg font-bold flex items-center justify-center gap-2">
+                  <LogIn className="w-4 h-4" /> Se connecter
+                </button>
+              </div>
+            )}
+            <p className="text-theme-muted text-sm mb-4">
+              Vous ne voulez pas attendre ? Liez votre propre clé API Google Cloud (BYOK) pour continuer à générer en illimité.
+            </p>
+            <button 
+              onClick={async () => {
+                setShowOutOfTokensModal(false);
+                // @ts-ignore
+                if (typeof window !== 'undefined' && window.aistudio && window.aistudio.openSelectKey) {
+                  // @ts-ignore
+                  await window.aistudio.openSelectKey();
+                } else {
+                  alert("Veuillez lier votre clé API via les paramètres de l'application.");
+                }
+              }}
+              className="w-full bg-theme-accent/20 text-theme-accent border border-theme-accent/30 hover:bg-theme-accent hover:text-theme-bg py-3 rounded-lg font-bold transition-all"
+            >
+              Utiliser ma propre clé API
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* GUIDE MODAL */}
       {showGuide && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowGuide(false)}>
@@ -3252,7 +3324,9 @@ export default function App() {
                   <br/>- Fiche RPG : 2 tokens
                   <br/>- Vidéo 4K : 50 tokens
                   <br/><br/>
-                  Une fois vos tokens épuisés, vous serez invité à lier votre propre clé API Google Cloud (BYOK) pour continuer à générer du contenu facturé directement sur votre compte Google.
+                  <strong className="text-theme-accent">Nouveau :</strong> Connectez-vous avec votre compte Google pour sauvegarder vos tokens. Si vous êtes connecté, votre solde sera <strong className="text-theme-text">automatiquement rechargé à 200 tokens toutes les semaines</strong> !
+                  <br/><br/>
+                  Une fois vos tokens épuisés avant la fin de la semaine, vous serez invité à lier votre propre clé API Google Cloud (BYOK) pour continuer à générer du contenu facturé directement sur votre compte Google.
                 </p>
               </div>
 

@@ -18,13 +18,18 @@
           "type": "number",
           "description": "The number of tokens the user has remaining."
         },
+        "lastRefillDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date and time the user's tokens were last refilled."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",
           "description": "The date and time the user was created."
         }
       },
-      "required": ["uid", "email", "tokens", "createdAt"]
+      "required": ["uid", "email", "tokens", "lastRefillDate", "createdAt"]
     }
   },
   "firestore": {
