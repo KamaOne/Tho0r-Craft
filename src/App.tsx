@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag, Menu, Search, User, Activity, Ghost, Box, Building, Trees, Car, PenTool, Zap, Brain, Shirt, Clapperboard, Sword, Layout, Skull, PawPrint, Home, Utensils, Bookmark, Heart } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag, Menu, Search, User, Activity, Ghost, Box, Building, Trees, Car, PenTool, Zap, Brain, Shirt, Clapperboard, Sword, Layout, Skull, PawPrint, Home, Utensils, Bookmark, Heart, AlignLeft } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import ReactCrop, { type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -147,11 +147,44 @@ export default function App() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [gallery, setGallery] = useState<{image: string, prompt: string, time: string, category: string, timestamp: number, tags?: string[], isFavorite?: boolean}[]>([]);
-  const [gallerySort, setGallerySort] = useState<'date_desc' | 'date_asc' | 'prompt' | 'category'>('date_desc');
+  const [gallery, setGallery] = useState<{image: string, prompt: string, time: string, category: string, timestamp: number, tags?: string[], isFavorite?: boolean, project?: string}[]>([]);
+  const [gallerySort, setGallerySort] = useState<'date_desc' | 'date_asc' | 'prompt' | 'category' | 'manual'>('date_desc');
   const [galleryFilter, setGalleryFilter] = useState<string>('All');
+  const [galleryProjectFilter, setGalleryProjectFilter] = useState<string>('All');
   const [galleryTagFilter, setGalleryTagFilter] = useState<string>('All');
   const [tagInput, setTagInput] = useState<Record<string, string>>({});
+  const [currentProject, setCurrentProject] = useState<string>('');
+  const [draggedItemImage, setDraggedItemImage] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, image: string) => {
+    setDraggedItemImage(image);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, targetImage: string) => {
+    e.preventDefault();
+    if (!draggedItemImage || draggedItemImage === targetImage) return;
+
+    setGallery(prev => {
+      const newGallery = [...prev];
+      const draggedIndex = newGallery.findIndex(g => g.image === draggedItemImage);
+      const targetIndex = newGallery.findIndex(g => g.image === targetImage);
+      
+      if (draggedIndex === -1 || targetIndex === -1) return prev;
+      
+      const [draggedItem] = newGallery.splice(draggedIndex, 1);
+      newGallery.splice(targetIndex, 0, draggedItem);
+      
+      return newGallery;
+    });
+    setGallerySort('manual');
+    setDraggedItemImage(null);
+  };
 
   const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
   const [variations, setVariations] = useState<string[]>([]);
@@ -566,7 +599,7 @@ export default function App() {
         if (images.length > 0) {
           setRotationImages(images);
           setGeneratedImage(images[0]);
-          setGallery(prev => [{ image: images[0], prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+          setGallery(prev => [{ image: images[0], prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject }, ...prev]);
           setIsFocusMode(true);
         } else {
           throw new Error("No image data returned for rotation. This may be due to safety filters or an invalid prompt.");
@@ -599,14 +632,14 @@ export default function App() {
         if (inlineData?.data) {
           const imgData = `data:image/png;base64,${inlineData.data}`;
           setGeneratedImage(imgData);
-          setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+          setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject }, ...prev]);
           setIsFocusMode(true);
         } else if (generatedImages && generatedImages.length > 0) {
           const imgBytes = generatedImages[0].image?.imageBytes || generatedImages[0].image?.image_bytes;
           if (imgBytes) {
             const imgData = `data:image/png;base64,${imgBytes}`;
             setGeneratedImage(imgData);
-            setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+            setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject }, ...prev]);
             setIsFocusMode(true);
           } else {
             throw new Error("generatedImages found but no imageBytes");
@@ -669,6 +702,50 @@ export default function App() {
       reader.readAsText(file);
     };
     input.click();
+  };
+
+  const handleSurpriseMe = () => {
+    const cats = Object.keys(config);
+    const randomCat = cats[Math.floor(Math.random() * cats.length)];
+    const catConfig = config[randomCat];
+    
+    const layouts = Object.keys(catConfig.layouts);
+    const randomLayout = layouts[Math.floor(Math.random() * layouts.length)];
+    
+    const randomStyle = Object.keys(stylesData)[Math.floor(Math.random() * Object.keys(stylesData).length)];
+    const randomLight = Object.keys(lightsData)[Math.floor(Math.random() * Object.keys(lightsData).length)];
+    const randomBg = Object.keys(bgsData)[Math.floor(Math.random() * Object.keys(bgsData).length)];
+    
+    const randomAngles = [];
+    if (Math.random() > 0.5) {
+      randomAngles.push(angles[Math.floor(Math.random() * angles.length)].id);
+    }
+    
+    const randomAttrs: Record<string, string> = {};
+    catConfig.attrs.forEach((attr: any) => {
+      if (Math.random() > 0.3) {
+        if (attr.type === 'multi-select') {
+          const numSelections = Math.floor(Math.random() * 3) + 1;
+          const optionsWithoutAucun = attr.options.filter((o: string) => o !== 'Aucun');
+          const shuffled = [...optionsWithoutAucun].sort(() => 0.5 - Math.random());
+          randomAttrs[attr.id] = shuffled.slice(0, numSelections).join(', ');
+        } else {
+          randomAttrs[attr.id] = attr.options[Math.floor(Math.random() * attr.options.length)];
+        }
+      }
+    });
+
+    const subjects = PREDEFINED_SUBJECTS.slice(1);
+    const randomSubject = subjects[Math.floor(Math.random() * subjects.length)].value;
+
+    setCategory(randomCat);
+    setLayout(randomLayout);
+    setStyle(randomStyle);
+    setLighting(randomLight);
+    setBackground(randomBg);
+    setSelectedAngles(randomAngles);
+    setAttributes(randomAttrs);
+    setSubject(randomSubject);
   };
 
   const handleGenerateVariations = async () => {
@@ -903,7 +980,7 @@ export default function App() {
         } else {
           setGeneratedImage(newImgData);
         }
-        setGallery(prev => [{ image: newImgData, prompt: generatedPrompt + " (Upscaled 2K)", time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now() }, ...prev]);
+        setGallery(prev => [{ image: newImgData, prompt: generatedPrompt + " (Upscaled 2K)", time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject }, ...prev]);
         setIsFocusMode(true);
       } else {
         throw new Error("No image data returned from upscaler.");
@@ -1032,6 +1109,7 @@ export default function App() {
       if (galleryFilter === 'Favorites') return item.isFavorite;
       return (item.category || 'Unknown') === galleryFilter;
     })
+    .filter(item => galleryProjectFilter === 'All' || (item.project || 'Uncategorized') === galleryProjectFilter)
     .filter(item => galleryTagFilter === 'All' || (item.tags && item.tags.includes(galleryTagFilter)))
     .sort((a, b) => {
       const timeA = a.timestamp || 0;
@@ -1316,15 +1394,37 @@ export default function App() {
                             >
                               Auto
                             </button>
-                            {attr.options.map((o: string) => (
-                              <button
-                                key={o}
-                                onClick={() => setAttributes({...attributes, [attr.id]: o})}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${attributes[attr.id] === o ? 'bg-theme-accent text-theme-bg border-theme-accent shadow-md' : 'bg-theme-bg text-theme-muted border-theme-border hover:border-theme-accent hover:text-theme-text'}`}
-                              >
-                                {o}
-                              </button>
-                            ))}
+                            {attr.options.map((o: string) => {
+                              const isMulti = attr.type === 'multi-select';
+                              const currentVals = attributes[attr.id] ? attributes[attr.id].split(', ') : [];
+                              const isSelected = isMulti ? currentVals.includes(o) : attributes[attr.id] === o;
+                              
+                              return (
+                                <button
+                                  key={o}
+                                  onClick={() => {
+                                    if (isMulti) {
+                                      if (o === 'Aucun') {
+                                        setAttributes({...attributes, [attr.id]: 'Aucun'});
+                                      } else {
+                                        let newVals = currentVals.filter(v => v !== 'Aucun');
+                                        if (newVals.includes(o)) {
+                                          newVals = newVals.filter(v => v !== o);
+                                        } else {
+                                          newVals.push(o);
+                                        }
+                                        setAttributes({...attributes, [attr.id]: newVals.join(', ')});
+                                      }
+                                    } else {
+                                      setAttributes({...attributes, [attr.id]: o});
+                                    }
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${isSelected ? 'bg-theme-accent text-theme-bg border-theme-accent shadow-md' : 'bg-theme-bg text-theme-muted border-theme-border hover:border-theme-accent hover:text-theme-text'}`}
+                                >
+                                  {o}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       ))}
@@ -1894,6 +1994,13 @@ export default function App() {
                     {isFocusMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   </button>
                   <button 
+                    onClick={handleSurpriseMe} 
+                    className="bg-theme-panel border border-theme-border hover:border-theme-accent text-theme-text px-4 py-2 rounded-full font-black text-xs tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2"
+                    title="Generate a random configuration"
+                  >
+                    <Dices className="w-4 h-4" /> SURPRISE ME
+                  </button>
+                  <button 
                     onClick={handleEnhance} 
                     disabled={isEnhancing || !subject} 
                     className="bg-theme-panel border border-theme-border hover:border-theme-accent text-theme-text px-4 py-2 rounded-full font-black text-xs tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2 disabled:opacity-50"
@@ -2135,7 +2242,25 @@ export default function App() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <input 
+                      type="text" 
+                      placeholder="Current Project (for new images)..." 
+                      value={currentProject}
+                      onChange={(e) => setCurrentProject(e.target.value)}
+                      className="bg-theme-panel border border-theme-border rounded-lg text-xs p-2 text-theme-text focus:border-theme-accent outline-none w-48"
+                    />
+                    <select 
+                      value={galleryProjectFilter}
+                      onChange={(e) => setGalleryProjectFilter(e.target.value)}
+                      className="bg-theme-panel border border-theme-border rounded-lg text-xs p-2 text-theme-text focus:border-theme-accent outline-none"
+                    >
+                      <option value="All">All Projects</option>
+                      <option value="Uncategorized">Uncategorized</option>
+                      {Array.from(new Set(gallery.map(g => g.project).filter(Boolean))).map(proj => (
+                        <option key={proj} value={proj}>{proj}</option>
+                      ))}
+                    </select>
                     <select 
                       value={galleryFilter}
                       onChange={(e) => setGalleryFilter(e.target.value)}
@@ -2166,6 +2291,7 @@ export default function App() {
                       <option value="date_asc">Oldest First</option>
                       <option value="prompt">Prompt (A-Z)</option>
                       <option value="category">Category (A-Z)</option>
+                      <option value="manual">Manual (Drag & Drop)</option>
                     </select>
                     <button
                       onClick={() => {
@@ -2188,7 +2314,14 @@ export default function App() {
                 </div>
                 <div className={`grid grid-cols-1 sm:grid-cols-2 ${isFocusMode ? 'lg:grid-cols-3 xl:grid-cols-4' : (isSidebarCollapsed ? 'xl:grid-cols-3' : '')} gap-4 max-h-[600px] overflow-y-auto pr-2`}>
                   {filteredAndSortedGallery.map((item) => (
-                    <div key={item.image} className={`bg-theme-panel rounded-xl overflow-hidden border group transition-all duration-500 hover:shadow-[0_0_20px_var(--accent)] ${selectedForComparison.includes(item.image) ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'border-theme-border hover:border-theme-accent'}`}>
+                    <div 
+                      key={item.image} 
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, item.image)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, item.image)}
+                      className={`bg-theme-panel rounded-xl overflow-hidden border group transition-all duration-500 hover:shadow-[0_0_20px_var(--accent)] ${selectedForComparison.includes(item.image) ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'border-theme-border hover:border-theme-accent'} ${draggedItemImage === item.image ? 'opacity-50 scale-95' : ''}`}
+                    >
                       <div className="relative cursor-pointer overflow-hidden" onClick={() => {
                         if (isComparisonMode) {
                           setSelectedForComparison(prev => {
@@ -2204,8 +2337,7 @@ export default function App() {
                           src={item.image} 
                           alt="Generated" 
                           className={`w-full h-auto object-cover aspect-square transition-transform duration-500 ${isComparisonMode ? '' : 'group-hover:scale-110'}`}
-                          draggable
-                          onDragStart={(e) => e.dataTransfer.setData('text/plain', item.image)}
+                          draggable={false}
                         />
                         <button
                           onClick={(e) => {
@@ -2253,6 +2385,15 @@ export default function App() {
                           <p className="text-[10px] text-theme-muted">{item.time}</p>
                           <span className="text-[10px] bg-theme-bg px-2 py-0.5 rounded-full text-theme-accent border border-theme-border">{item.category || 'Unknown'}</span>
                         </div>
+                        <input 
+                          type="text" 
+                          placeholder="Project..." 
+                          value={item.project || ''}
+                          onChange={(e) => {
+                            setGallery(prev => prev.map(g => g.image === item.image ? { ...g, project: e.target.value } : g));
+                          }}
+                          className="bg-theme-bg border border-theme-border rounded text-[10px] p-1 text-theme-text focus:border-theme-accent outline-none w-full mb-2"
+                        />
                         <p className="text-xs text-theme-text line-clamp-3 font-mono" title={item.prompt}>{item.prompt}</p>
                         
                         <div className="mt-2 flex flex-wrap gap-1">
@@ -2296,7 +2437,7 @@ export default function App() {
                             className="w-full py-1.5 bg-theme-bg border border-theme-border rounded text-xs text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors flex items-center justify-center gap-1"
                             title="Use as Reference (Img2Img)"
                           >
-                            <Image className="w-3 h-3" /> Utiliser comme Réf.
+                            <ImageIcon className="w-3 h-3" /> Utiliser comme Réf.
                           </button>
                           <div className="flex gap-2 w-full">
                             <button 
@@ -2794,6 +2935,15 @@ export default function App() {
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold bg-theme-accent/20 text-theme-accent px-3 py-1.5 rounded-full border border-theme-accent/30 uppercase tracking-widest">{item.category || 'Unknown'}</span>
                     <div className="flex items-center gap-3">
+                      <input 
+                        type="text" 
+                        placeholder="Project..." 
+                        value={item.project || ''}
+                        onChange={(e) => {
+                          setGallery(prev => prev.map(g => g.image === item.image ? { ...g, project: e.target.value } : g));
+                        }}
+                        className="bg-theme-bg border border-theme-border rounded text-[10px] p-1 text-theme-text focus:border-theme-accent outline-none w-24"
+                      />
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -2848,7 +2998,7 @@ export default function App() {
                       }}
                       className="w-full py-3 bg-theme-bg border border-theme-border rounded-xl text-sm font-bold text-theme-text hover:text-theme-accent hover:border-theme-accent transition-all flex items-center justify-center gap-2 group"
                     >
-                      <Image className="w-4 h-4 group-hover:scale-110 transition-transform" /> Utiliser comme Référence (Img2Img)
+                      <ImageIcon className="w-4 h-4 group-hover:scale-110 transition-transform" /> Utiliser comme Référence (Img2Img)
                     </button>
                     <button 
                       onClick={() => {
