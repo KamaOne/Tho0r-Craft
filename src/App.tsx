@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag, Menu, Search, User, Activity, Ghost, Box, Building, Trees, Car, PenTool, Zap, Brain, Shirt, Clapperboard, Sword, Layout, Skull, PawPrint, Home, Utensils, Bookmark, Heart, AlignLeft } from 'lucide-react';
+import { Settings, RefreshCw, Dices, Copy, Trash2, Info, X, Loader2, Image as ImageIcon, Download, Upload, Wand2, Keyboard, ZoomIn, Maximize2, Minimize2, Camera, Scan, Aperture, Focus, Eye, Crosshair, Video, Layers, Sliders, ArrowUpCircle, Undo, Redo, Edit3, Crop as CropIcon, RotateCw, Sun, Contrast, Tag, Menu, Search, User, Activity, Ghost, Box, Building, Trees, Car, PenTool, Zap, Brain, Shirt, Clapperboard, Sword, Layout, Skull, PawPrint, Home, Utensils, Bookmark, Heart, AlignLeft, Brush, FileText, LogIn, LogOut } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import ReactCrop, { type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -8,6 +8,60 @@ import { LiveAssistant } from './components/LiveAssistant';
 import { ThemeSettings } from './components/ThemeSettings';
 import { Chatbot } from './components/Chatbot';
 import { saveGallery, loadGallery } from './lib/db';
+import { auth, db, googleProvider } from './firebase';
+import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email || undefined,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId || undefined,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 interface AppState {
   category: string;
@@ -147,7 +201,7 @@ export default function App() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [gallery, setGallery] = useState<{image: string, prompt: string, time: string, category: string, timestamp: number, tags?: string[], isFavorite?: boolean, project?: string}[]>([]);
+  const [gallery, setGallery] = useState<{image: string, prompt: string, time: string, category: string, timestamp: number, tags?: string[], isFavorite?: boolean, project?: string, promptHistory?: string[], characterSheet?: string, video?: string}[]>([]);
   const [gallerySort, setGallerySort] = useState<'date_desc' | 'date_asc' | 'prompt' | 'category' | 'manual'>('date_desc');
   const [galleryFilter, setGalleryFilter] = useState<string>('All');
   const [galleryProjectFilter, setGalleryProjectFilter] = useState<string>('All');
@@ -155,6 +209,153 @@ export default function App() {
   const [tagInput, setTagInput] = useState<Record<string, string>>({});
   const [currentProject, setCurrentProject] = useState<string>('');
   const [draggedItemImage, setDraggedItemImage] = useState<string | null>(null);
+  const [selectedGalleryItems, setSelectedGalleryItems] = useState<string[]>([]);
+  const [isGeneratingSheet, setIsGeneratingSheet] = useState(false);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState<string | null>(null);
+  const [tokens, setTokens] = useState<number>(() => parseInt(localStorage.getItem('tho0r_tokens') || '200'));
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      setIsAuthReady(true);
+      
+      if (currentUser) {
+        const userRef = doc(db, 'users', currentUser.uid);
+        try {
+          const docSnap = await getDoc(userRef);
+          if (!docSnap.exists()) {
+            await setDoc(userRef, {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              tokens: 200,
+              createdAt: serverTimestamp()
+            });
+          }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthReady && user) {
+      const userRef = doc(db, 'users', user.uid);
+      const unsubscribe = onSnapshot(userRef, (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          if (data.tokens !== undefined) {
+            setTokens(data.tokens);
+            localStorage.setItem('tho0r_tokens', data.tokens.toString());
+          }
+        }
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+      });
+      return () => unsubscribe();
+    }
+  }, [isAuthReady, user]);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login failed", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setTokens(200); // Reset to local default on logout
+      localStorage.setItem('tho0r_tokens', '200');
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
+
+  const [isInpaintingMode, setIsInpaintingMode] = useState(false);
+  const [brushSize, setBrushSize] = useState(20);
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingRef = useRef(false);
+
+  useEffect(() => {
+    if (isInpaintingMode && maskCanvasRef.current && generatedImage) {
+      const img = new Image();
+      img.onload = () => {
+        if (maskCanvasRef.current) {
+          maskCanvasRef.current.width = img.width;
+          maskCanvasRef.current.height = img.height;
+          const ctx = maskCanvasRef.current.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, img.width, img.height);
+          }
+        }
+      };
+      img.src = rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage;
+    }
+  }, [isInpaintingMode, generatedImage, rotationImages, rotationIndex]);
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    isDrawingRef.current = true;
+    draw(e);
+  };
+
+  const stopDrawing = () => {
+    isDrawingRef.current = false;
+    if (maskCanvasRef.current) {
+      const ctx = maskCanvasRef.current.getContext('2d');
+      if (ctx) ctx.beginPath();
+    }
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || !maskCanvasRef.current) return;
+    
+    const canvas = maskCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    let clientX, clientY;
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+
+    ctx.lineWidth = brushSize * scaleX;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'white';
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const clearMask = () => {
+    if (maskCanvasRef.current) {
+      const ctx = maskCanvasRef.current.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
+      }
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent, image: string) => {
     setDraggedItemImage(image);
@@ -184,6 +385,45 @@ export default function App() {
     });
     setGallerySort('manual');
     setDraggedItemImage(null);
+  };
+
+  const handleBatchDelete = () => {
+    if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedGalleryItems.length} image(s) ?`)) {
+      setGallery(prev => prev.filter(g => !selectedGalleryItems.includes(g.image)));
+      setSelectedGalleryItems([]);
+    }
+  };
+
+  const handleBatchProject = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const project = e.currentTarget.value;
+      setGallery(prev => prev.map(g => selectedGalleryItems.includes(g.image) ? { ...g, project } : g));
+      setSelectedGalleryItems([]);
+    }
+  };
+
+  const handleBatchTags = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const newTagsStr = e.currentTarget.value;
+      if (!newTagsStr.trim()) return;
+      
+      const newTags = newTagsStr.split(',').map(t => t.trim()).filter(Boolean);
+      
+      setGallery(prev => prev.map(g => {
+        if (selectedGalleryItems.includes(g.image)) {
+          const currentTags = g.tags || [];
+          const updatedTags = [...currentTags];
+          newTags.forEach(t => {
+            if (!updatedTags.includes(t)) updatedTags.push(t);
+          });
+          return { ...g, tags: updatedTags };
+        }
+        return g;
+      }));
+      
+      e.currentTarget.value = '';
+      setSelectedGalleryItems([]);
+    }
   };
 
   const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
@@ -319,7 +559,7 @@ export default function App() {
       return;
     }
     
-    const msg = new SpeechSynthesisUtterance("Bonjour, je suis Hildegarde, votre narratrice. Bienvenue dans Tho0r-Craft. Je peux maintenant vous aider avec l'import/export, les raccourcis clavier, le menu latéral, le mode focus automatique et le téléchargement direct des images ! / Hello, I am Hildegarde, your narrator. Welcome to Tho0r-Craft. I can now help you with import/export, keyboard shortcuts, the sidebar, auto-focus mode, and direct image downloads!");
+    const msg = new SpeechSynthesisUtterance("Bonjour, je suis Hildegarde, votre narratrice. Bienvenue dans Tho0r-Craft. Je peux maintenant vous aider avec l'import/export, le menu latéral, le mode focus automatique, le téléchargement direct des images, et le nouveau système de tokens avec connexion Google ! / Hello, I am Hildegarde, your narrator. Welcome to Tho0r-Craft. I can now help you with import/export, the sidebar, auto-focus mode, direct image downloads, and the new token system with Google login!");
     msg.pitch = 1.2;
     msg.rate = 0.9;
     window.speechSynthesis.speak(msg);
@@ -508,11 +748,44 @@ export default function App() {
     alert("Prompt sauvegardé !");
   };
 
+  const checkTokens = async (cost: number) => {
+    if (tokens >= cost) {
+      const newTokens = tokens - cost;
+      setTokens(newTokens);
+      localStorage.setItem('tho0r_tokens', newTokens.toString());
+      
+      if (user) {
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, { tokens: newTokens });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+        }
+      }
+      
+      return true;
+    }
+    
+    // Not enough tokens, trigger BYOK
+    // @ts-ignore
+    if (typeof window !== 'undefined' && window.aistudio && window.aistudio.openSelectKey) {
+      // @ts-ignore
+      await window.aistudio.openSelectKey();
+      return true; // Assume they entered a key and we can proceed using their billing
+    }
+    
+    alert("Pas assez de tokens. Veuillez lier votre propre clé API Google Cloud.");
+    return false;
+  };
+
   const handleGenerateImage = async () => {
     if (img2img && !referenceImage) {
       alert("Veuillez uploader une image de référence pour utiliser la fonction Img2Img.");
       return;
     }
+
+    const hasAccess = await checkTokens(5);
+    if (!hasAccess) return;
 
     setIsGeneratingImage(true);
     setGeneratedImage(null);
@@ -537,12 +810,29 @@ export default function App() {
           cleanPrompt += `\nDo not include: ${customNegPrompt.trim()}`;
       }
 
+      let parentHistory: string[] = [];
+      if (img2img && referenceImage) {
+        const parent = gallery.find(g => g.image === referenceImage);
+        if (parent && parent.promptHistory) parentHistory = parent.promptHistory;
+      } else if (isInpaintingMode && generatedImage) {
+        const currentImg = rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage;
+        const parent = gallery.find(g => g.image === currentImg);
+        if (parent && parent.promptHistory) parentHistory = parent.promptHistory;
+      }
+      const newHistory = [...parentHistory, generatedPrompt];
+
       const getParts = (promptText: string) => {
         const parts: any[] = [];
-        if (img2img && referenceImage) {
-          if (referenceImage.startsWith('data:')) {
-            const mimeType = referenceImage.match(/data:(.*?);/)?.[1] || 'image/png';
-            const base64Data = referenceImage.split(',')[1];
+        
+        let baseImage = img2img ? referenceImage : null;
+        if (isInpaintingMode && generatedImage) {
+          baseImage = rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage;
+        }
+
+        if (baseImage) {
+          if (baseImage.startsWith('data:')) {
+            const mimeType = baseImage.match(/data:(.*?);/)?.[1] || 'image/png';
+            const base64Data = baseImage.split(',')[1];
             parts.push({
               inlineData: {
                 data: base64Data,
@@ -553,6 +843,18 @@ export default function App() {
             throw new Error("Reference image must be a valid uploaded image or gallery image.");
           }
         }
+
+        if (isInpaintingMode && maskCanvasRef.current) {
+          const maskData = maskCanvasRef.current.toDataURL('image/png').split(',')[1];
+          parts.push({
+            inlineData: {
+              data: maskData,
+              mimeType: 'image/png'
+            }
+          });
+          promptText += "\n[INSTRUCTION: Use the second image as a mask. Only modify the areas highlighted in white in the mask, keeping the rest of the image exactly the same as the first image.]";
+        }
+
         parts.push({ text: promptText });
         return parts;
       };
@@ -599,7 +901,7 @@ export default function App() {
         if (images.length > 0) {
           setRotationImages(images);
           setGeneratedImage(images[0]);
-          setGallery(prev => [{ image: images[0], prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject }, ...prev]);
+          setGallery(prev => [{ image: images[0], prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject, promptHistory: newHistory }, ...prev]);
           setIsFocusMode(true);
         } else {
           throw new Error("No image data returned for rotation. This may be due to safety filters or an invalid prompt.");
@@ -632,14 +934,14 @@ export default function App() {
         if (inlineData?.data) {
           const imgData = `data:image/png;base64,${inlineData.data}`;
           setGeneratedImage(imgData);
-          setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject }, ...prev]);
+          setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject, promptHistory: newHistory }, ...prev]);
           setIsFocusMode(true);
         } else if (generatedImages && generatedImages.length > 0) {
           const imgBytes = generatedImages[0].image?.imageBytes || generatedImages[0].image?.image_bytes;
           if (imgBytes) {
             const imgData = `data:image/png;base64,${imgBytes}`;
             setGeneratedImage(imgData);
-            setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject }, ...prev]);
+            setGallery(prev => [{ image: imgData, prompt: generatedPrompt, time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject, promptHistory: newHistory }, ...prev]);
             setIsFocusMode(true);
           } else {
             throw new Error("generatedImages found but no imageBytes");
@@ -921,10 +1223,119 @@ export default function App() {
     document.body.removeChild(link);
   };
 
+  const handleExportPDF = (item: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${item.project || 'Character'} - Sheet</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; color: #333; }
+            img { max-width: 100%; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+            pre { white-space: pre-wrap; background: #f5f5f5; padding: 20px; border-radius: 8px; font-family: inherit; line-height: 1.6; }
+            @media print {
+              button { display: none; }
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <img src="${item.image}" alt="Character" />
+          <h1>${item.project || 'Character Sheet'}</h1>
+          <pre>${item.characterSheet}</pre>
+          <script>
+            window.onload = () => window.print();
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const handleGenerateSheet = async (image: string, prompt: string, category: string) => {
+    const hasAccess = await checkTokens(2);
+    if (!hasAccess) return;
+
+    setIsGeneratingSheet(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `You are an expert RPG game master. Based on this character generation prompt: "${prompt}" (Category: ${category}), create a concise and immersive RPG character sheet. Include:\n- Name (invent a fitting one)\n- Class & Race\n- Core Stats (STR, DEX, CON, INT, WIS, CHA)\n- 2 Special Abilities\n- A short background lore (2-3 sentences).\nFormat cleanly with markdown.`,
+      });
+      if (response.text) {
+        setGallery(prev => prev.map(g => g.image === image ? { ...g, characterSheet: response.text } : g));
+      }
+    } catch (error: any) {
+      console.error("Error generating sheet:", error);
+      alert(`Error generating character sheet: ${error.message}`);
+    } finally {
+      setIsGeneratingSheet(false);
+    }
+  };
+
+  const handleGenerateVideo = async (image: string, prompt: string) => {
+    const hasAccess = await checkTokens(50);
+    if (!hasAccess) return;
+
+    setIsGeneratingVideo(image);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const base64Data = image.split(',')[1];
+      const mimeType = image.match(/data:(.*?);/)?.[1] || 'image/png';
+
+      let operation = await ai.models.generateVideos({
+        model: 'veo-3.1-generate-preview',
+        prompt: `Animate this character/scene smoothly. ${prompt}`,
+        image: {
+          imageBytes: base64Data,
+          mimeType: mimeType,
+        },
+        config: {
+          numberOfVideos: 1,
+          resolution: '1080p', // Using 1080p for stability in preview, though 4k is possible, it often times out.
+          aspectRatio: '16:9'
+        }
+      });
+
+      while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        operation = await ai.operations.getVideosOperation({operation: operation});
+      }
+
+      const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+      
+      if (videoUri) {
+        // Fetch the video to get a blob URL we can play directly without CORS issues
+        const response = await fetch(videoUri, {
+          method: 'GET',
+          headers: {
+            'x-goog-api-key': process.env.GEMINI_API_KEY || '',
+          },
+        });
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        setGallery(prev => prev.map(g => g.image === image ? { ...g, video: blobUrl } : g));
+      }
+    } catch (error: any) {
+      console.error("Video error:", error);
+      alert(`Error generating video: ${error.message}`);
+    } finally {
+      setIsGeneratingVideo(null);
+    }
+  };
+
   const handleUpscale = async () => {
     const imgToUpscale = rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage;
     if (!imgToUpscale) return;
     
+    const hasAccess = await checkTokens(10);
+    if (!hasAccess) return;
+
     setIsUpscaling(true);
     try {
       // @ts-ignore
@@ -973,6 +1384,11 @@ export default function App() {
       }
       
       if (newImgData) {
+        let parentHistory: string[] = [];
+        const parent = gallery.find(g => g.image === imgToUpscale);
+        if (parent && parent.promptHistory) parentHistory = parent.promptHistory;
+        const newHistory = [...parentHistory, generatedPrompt + " (Upscaled 2K)"];
+
         if (rotationImages.length > 0) {
           const newRotations = [...rotationImages];
           newRotations[rotationIndex] = newImgData;
@@ -980,7 +1396,7 @@ export default function App() {
         } else {
           setGeneratedImage(newImgData);
         }
-        setGallery(prev => [{ image: newImgData, prompt: generatedPrompt + " (Upscaled 2K)", time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject }, ...prev]);
+        setGallery(prev => [{ image: newImgData, prompt: generatedPrompt + " (Upscaled 2K)", time: new Date().toLocaleTimeString(), category: config[category].label, timestamp: Date.now(), project: currentProject, promptHistory: newHistory }, ...prev]);
         setIsFocusMode(true);
       } else {
         throw new Error("No image data returned from upscaler.");
@@ -1138,9 +1554,28 @@ export default function App() {
               <p className="text-[8px] text-theme-muted font-medium tracking-widest uppercase italic">Director Console</p>
             </div>
           </div>
-          <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="text-theme-muted hover:text-theme-text transition-colors p-1 rounded-lg hover:bg-theme-accent/10">
-            <Menu className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {user ? (
+              <div className="flex items-center gap-2">
+                {user.photoURL && <img src={user.photoURL} alt="Profile" className="w-6 h-6 rounded-full border border-theme-border" />}
+                <button onClick={handleLogout} className="text-xs font-bold text-theme-muted hover:text-theme-accent transition-colors flex items-center gap-1" title="Se déconnecter">
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button onClick={handleLogin} className="text-xs font-bold text-theme-muted hover:text-theme-accent transition-colors flex items-center gap-1" title="Se connecter pour sauvegarder les tokens">
+                <LogIn className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">LOGIN</span>
+              </button>
+            )}
+            <div className="flex items-center gap-1.5 bg-theme-bg px-3 py-1.5 rounded-full border border-theme-border" title="Tokens restants">
+              <Zap className="w-3.5 h-3.5 text-theme-accent" />
+              <span className="text-xs font-bold text-theme-accent">{tokens}</span>
+            </div>
+            <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="text-theme-muted hover:text-theme-text transition-colors p-1 rounded-lg hover:bg-theme-accent/10">
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
         </div>
         
         {!isSidebarCollapsed && (
@@ -2084,6 +2519,9 @@ export default function App() {
                   <div className="flex gap-3">
                     {!isEditingImage ? (
                       <>
+                        <button onClick={() => setIsInpaintingMode(!isInpaintingMode)} className={`${isInpaintingMode ? 'text-green-500' : 'text-theme-accent hover:text-theme-text'} transition-colors flex items-center gap-1 text-xs font-bold`}>
+                          <Brush className="w-4 h-4" /> {isInpaintingMode ? 'EXIT INPAINT' : 'INPAINT'}
+                        </button>
                         <button onClick={() => setIsEditingImage(true)} className="text-theme-accent hover:text-theme-text transition-colors flex items-center gap-1 text-xs font-bold">
                           <Edit3 className="w-4 h-4" /> EDIT
                         </button>
@@ -2106,17 +2544,51 @@ export default function App() {
                     )}
                   </div>
                 </div>
+
+                {isInpaintingMode && (
+                  <div className="flex items-center gap-4 mb-4 p-3 bg-theme-panel rounded-xl border border-theme-border">
+                    <span className="text-xs font-bold text-theme-muted">Brush Size:</span>
+                    <input 
+                      type="range" 
+                      min="5" max="100" 
+                      value={brushSize} 
+                      onChange={(e) => setBrushSize(Number(e.target.value))}
+                      className="flex-1 accent-theme-accent"
+                    />
+                    <button onClick={clearMask} className="text-xs bg-red-500/20 text-red-500 px-3 py-1 rounded hover:bg-red-500/30 transition-colors">
+                      Clear Mask
+                    </button>
+                  </div>
+                )}
+
                 {!isEditingImage ? (
                   <>
-                    <div className="relative group cursor-pointer overflow-hidden rounded-xl transition-all duration-500 hover:shadow-[0_0_30px_var(--accent)]" onClick={() => setZoomedImage(rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage)}>
+                    <div className={`relative group overflow-hidden rounded-xl transition-all duration-500 ${!isInpaintingMode ? 'cursor-pointer hover:shadow-[0_0_30px_var(--accent)]' : ''}`} onClick={() => !isInpaintingMode && setZoomedImage(rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage)}>
                       <img 
                         src={rotationImages.length > 0 ? rotationImages[rotationIndex] : generatedImage} 
                         alt="Generated Vision" 
-                        className="w-full h-auto rounded-xl shadow-md transition-transform duration-500 group-hover:scale-105" 
+                        className={`w-full h-auto rounded-xl shadow-md transition-transform duration-500 ${!isInpaintingMode ? 'group-hover:scale-105' : ''}`} 
+                        draggable={false}
                       />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl flex items-center justify-center">
-                        <ZoomIn className="w-12 h-12 text-white" />
-                      </div>
+                      {isInpaintingMode && (
+                        <canvas
+                          ref={maskCanvasRef}
+                          onMouseDown={startDrawing}
+                          onMouseMove={draw}
+                          onMouseUp={stopDrawing}
+                          onMouseLeave={stopDrawing}
+                          onTouchStart={startDrawing}
+                          onTouchMove={draw}
+                          onTouchEnd={stopDrawing}
+                          className="absolute inset-0 w-full h-full cursor-crosshair opacity-50 mix-blend-screen"
+                          style={{ touchAction: 'none' }}
+                        />
+                      )}
+                      {!isInpaintingMode && (
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl flex items-center justify-center">
+                          <ZoomIn className="w-12 h-12 text-white" />
+                        </div>
+                      )}
                     </div>
                     {rotationImages.length > 0 && (
                       <div className="mt-6 bg-theme-panel p-4 rounded-xl border border-theme-border">
@@ -2242,6 +2714,38 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+
+                  {selectedGalleryItems.length > 0 && (
+                    <div className="bg-theme-accent/10 border border-theme-accent/30 p-3 rounded-xl flex items-center gap-4 animate-fade-in">
+                      <span className="text-sm font-bold text-theme-accent">{selectedGalleryItems.length} selected</span>
+                      <button 
+                        onClick={handleBatchDelete}
+                        className="text-xs bg-red-500/20 text-red-500 hover:bg-red-500/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" /> Delete
+                      </button>
+                      <input 
+                        type="text" 
+                        placeholder="Assign project & press Enter..." 
+                        onKeyDown={handleBatchProject}
+                        className="bg-theme-bg border border-theme-border rounded-lg text-xs p-1.5 text-theme-text focus:border-theme-accent outline-none w-48"
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Add tags (comma separated) & press Enter..." 
+                        onKeyDown={handleBatchTags}
+                        className="bg-theme-bg border border-theme-border rounded-lg text-xs p-1.5 text-theme-text focus:border-theme-accent outline-none w-64"
+                      />
+                      <div className="flex-1"></div>
+                      <button 
+                        onClick={() => setSelectedGalleryItems([])}
+                        className="text-xs text-theme-muted hover:text-theme-text transition-colors"
+                      >
+                        Cancel Selection
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap gap-2 items-center">
                     <input 
                       type="text" 
@@ -2338,6 +2842,20 @@ export default function App() {
                           alt="Generated" 
                           className={`w-full h-auto object-cover aspect-square transition-transform duration-500 ${isComparisonMode ? '' : 'group-hover:scale-110'}`}
                           draggable={false}
+                        />
+                        <input
+                          type="checkbox"
+                          checked={selectedGalleryItems.includes(item.image)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedGalleryItems(prev => [...prev, item.image]);
+                            } else {
+                              setSelectedGalleryItems(prev => prev.filter(img => img !== item.image));
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute top-2 right-2 w-4 h-4 z-10 cursor-pointer accent-theme-accent"
+                          title="Select image"
                         />
                         <button
                           onClick={(e) => {
@@ -2723,7 +3241,35 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>2.</span> Prompts Négatifs & Poids
+                  <span>2.</span> Modèle Freemium & Tokens
+                </h3>
+                <p className="text-theme-muted">
+                  La génération de prompts est <strong className="text-theme-text">100% gratuite et illimitée</strong>.
+                  <br/><br/>
+                  Pour la génération d'images, de vidéos et de fiches de personnages, vous disposez d'un solde de <strong className="text-theme-text">200 Tokens gratuits</strong>.
+                  <br/>- Image : 5 tokens
+                  <br/>- Upscale 2K : 10 tokens
+                  <br/>- Fiche RPG : 2 tokens
+                  <br/>- Vidéo 4K : 50 tokens
+                  <br/><br/>
+                  Une fois vos tokens épuisés, vous serez invité à lier votre propre clé API Google Cloud (BYOK) pour continuer à générer du contenu facturé directement sur votre compte Google.
+                </p>
+              </div>
+
+              <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
+                <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <span>3.</span> Édition & Animation (Nouveau)
+                </h3>
+                <p className="text-theme-muted">
+                  - <strong className="text-theme-text">Inpainting :</strong> Dans la vue de l'image générée, cliquez sur l'icône pinceau pour dessiner un masque. Modifiez votre prompt et générez pour ne modifier que la zone masquée.
+                  <br/>- <strong className="text-theme-text">Vidéo 4K :</strong> Dans la vue détaillée (Lightbox) d'une image, utilisez le bouton "ANIMATE IMAGE" pour générer une vidéo fluide à partir de votre création (utilise le modèle Veo 3.1).
+                  <br/>- <strong className="text-theme-text">Fiche RPG :</strong> Générez automatiquement une fiche de personnage complète (Stats, Lore, Classe) à partir de n'importe quelle image de personnage.
+                </p>
+              </div>
+
+              <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
+                <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <span>4.</span> Prompts Négatifs & Poids
                 </h3>
                 <p className="text-theme-muted">
                   Vous pouvez exclure des éléments de votre image via le champ <strong className="text-theme-text">Negative Prompt</strong>. 
@@ -2734,7 +3280,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>3.</span> Les Sliders de Post-Production
+                  <span>5.</span> Les Sliders de Post-Production
                 </h3>
                 <ul className="space-y-3 text-theme-muted">
                   <li className="flex items-start gap-2">
@@ -2754,7 +3300,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>4.</span> Freyad-Craft & Génération d'Images
+                  <span>6.</span> Freyad-Craft & Génération d'Images
                 </h3>
                 <p className="text-theme-muted">
                   <strong className="text-theme-text">Freyad-Craft</strong> est votre assistant IA (masculin) bilingue, accessible via l'icône en bas à droite. Il connaît parfaitement l'application et peut vous guider.
@@ -2765,7 +3311,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>5.</span> Image to Image (Img2Img)
+                  <span>7.</span> Image to Image (Img2Img)
                 </h3>
                 <p className="text-theme-muted">
                   Vous pouvez utiliser une image de référence pour guider la génération. Activez l'option <strong className="text-theme-text">Img2Img</strong>, uploadez une image, et utilisez l'outil de <strong className="text-theme-text">recadrage (Crop)</strong> pour sélectionner la zone importante. L'IA utilisera cette image comme base pour la nouvelle création.
@@ -2774,7 +3320,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>6.</span> Galerie, Tags & Comparaison
+                  <span>8.</span> Galerie, Tags & Comparaison
                 </h3>
                 <p className="text-theme-muted">
                   Toutes vos générations sont sauvegardées dans la <strong className="text-theme-text">Galerie</strong>. Vous pouvez ajouter des <strong className="text-theme-text">Tags personnalisés</strong> à chaque image, et utiliser le bouton de <strong className="text-theme-text">Téléchargement direct</strong> sur chaque miniature.
@@ -2785,7 +3331,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>7.</span> Menu Latéral & Mode Focus
+                  <span>9.</span> Menu Latéral & Mode Focus
                 </h3>
                 <p className="text-theme-muted">
                   Le nouveau <strong className="text-theme-text">Menu Latéral</strong> rétractable vous permet de naviguer rapidement entre les catégories. Il se ferme automatiquement sur mobile pour vous laisser l'espace de travail.
@@ -2796,7 +3342,7 @@ export default function App() {
 
               <div className="bg-theme-panel p-5 rounded-2xl border border-theme-border">
                 <h3 className="text-theme-accent font-bold uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <span>8.</span> Sauvegarde, Historique & Export
+                  <span>10.</span> Sauvegarde, Historique & Export
                 </h3>
                 <p className="text-theme-muted">
                   Utilisez les <strong className="text-theme-text">Presets</strong> pour enregistrer vos configurations favorites. L'<strong className="text-theme-text">Historique</strong> garde une trace de vos prompts copiés.
@@ -2975,6 +3521,20 @@ export default function App() {
                     </div>
                   </div>
 
+                  {item.promptHistory && item.promptHistory.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <h3 className="text-sm font-bold text-theme-text flex items-center gap-2 uppercase tracking-widest"><Layers className="w-4 h-4 text-theme-accent" /> Prompt History</h3>
+                      <div className="bg-theme-bg p-4 rounded-xl border border-theme-border max-h-48 overflow-y-auto custom-scrollbar flex flex-col gap-3">
+                        {item.promptHistory.map((histPrompt, idx) => (
+                          <div key={idx} className="flex flex-col gap-1 border-b border-theme-border/50 pb-2 last:border-0 last:pb-0">
+                            <span className="text-[10px] text-theme-accent font-bold uppercase">Step {idx + 1}</span>
+                            <p className="text-xs text-theme-muted font-mono">{histPrompt}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {item.tags && item.tags.length > 0 && (
                     <div className="flex flex-col gap-2">
                       <h3 className="text-sm font-bold text-theme-text flex items-center gap-2 uppercase tracking-widest"><Tag className="w-4 h-4 text-theme-accent" /> Tags</h3>
@@ -2987,6 +3547,64 @@ export default function App() {
                       </div>
                     </div>
                   )}
+
+                  <div className="flex flex-col gap-2 border-t border-theme-border pt-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-theme-text flex items-center gap-2 uppercase tracking-widest"><FileText className="w-4 h-4 text-theme-accent" /> Character Sheet</h3>
+                      {item.characterSheet && (
+                        <button 
+                          onClick={() => handleExportPDF(item)}
+                          className="text-xs font-bold text-theme-accent hover:text-theme-text transition-colors flex items-center gap-1"
+                        >
+                          <Download className="w-3 h-3" /> EXPORT PDF
+                        </button>
+                      )}
+                    </div>
+                    {item.characterSheet ? (
+                      <div className="bg-theme-bg p-4 rounded-xl border border-theme-border relative group">
+                        <div className="text-sm text-theme-muted font-mono leading-relaxed max-h-64 overflow-y-auto custom-scrollbar whitespace-pre-wrap">
+                          {item.characterSheet}
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(item.characterSheet!);
+                            triggerToast();
+                          }}
+                          className="absolute top-2 right-2 p-2 bg-theme-panel border border-theme-border rounded-lg text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-all opacity-0 group-hover:opacity-100"
+                          title="Copier la fiche"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleGenerateSheet(item.image, item.prompt, item.category)}
+                        disabled={isGeneratingSheet}
+                        className="w-full py-3 bg-theme-bg border border-theme-border rounded-xl text-sm font-bold text-theme-text hover:text-theme-accent hover:border-theme-accent transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isGeneratingSheet ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                        {isGeneratingSheet ? 'GENERATING...' : 'GENERATE RPG SHEET (2 TOKENS)'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2 border-t border-theme-border pt-6">
+                    <h3 className="text-sm font-bold text-theme-text flex items-center gap-2 uppercase tracking-widest"><Video className="w-4 h-4 text-theme-accent" /> Animation (4K)</h3>
+                    {item.video ? (
+                      <div className="bg-theme-bg p-2 rounded-xl border border-theme-border">
+                        <video src={item.video} controls className="w-full rounded-lg" autoPlay loop muted />
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleGenerateVideo(item.image, item.prompt)}
+                        disabled={isGeneratingVideo === item.image}
+                        className="w-full py-3 bg-theme-bg border border-theme-border rounded-xl text-sm font-bold text-theme-text hover:text-theme-accent hover:border-theme-accent transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isGeneratingVideo === item.image ? <Loader2 className="w-4 h-4 animate-spin" /> : <Video className="w-4 h-4" />}
+                        {isGeneratingVideo === item.image ? 'GENERATING VIDEO (CAN TAKE MINUTES)...' : 'ANIMATE IMAGE (50 TOKENS)'}
+                      </button>
+                    )}
+                  </div>
 
                   <div className="mt-auto pt-6 flex flex-col gap-3 border-t border-theme-border">
                     <button 

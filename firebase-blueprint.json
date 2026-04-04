@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Tho0r-Craft application.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The unique identifier for the user."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "tokens": {
+          "type": "number",
+          "description": "The number of tokens the user has remaining."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date and time the user was created."
+        }
+      },
+      "required": ["uid", "email", "tokens", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Stores user profiles and their token balances."
+    }
+  }
+}

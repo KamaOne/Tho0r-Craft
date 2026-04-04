@@ -1,0 +1,74 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required, immutable) - The user's ID
+    //   - email: string (required, immutable) - The user's email
+    //   - tokens: number (required) - The user's token balance
+    //   - createdAt: timestamp (required, immutable) - Creation time
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'tokens', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             data.email is string && isValidEmail(data.email) && data.email.size() < 150 &&
+             data.tokens is number && data.tokens >= 0 &&
+             data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      
+      // Allow creation with exactly 200 tokens
+      allow create: if isOwner(userId) && 
+                       isValidUser(request.resource.data) && 
+                       uidUnchanged() &&
+                       request.resource.data.tokens == 200 &&
+                       request.resource.data.createdAt == request.time;
+                       
+      // Allow update: tokens can only decrease, immutable fields cannot change
+      allow update: if isOwner(userId) && 
+                       isValidUser(request.resource.data) && 
+                       uidNotModified() &&
+                       request.resource.data.email == resource.data.email &&
+                       request.resource.data.createdAt == resource.data.createdAt &&
+                       request.resource.data.tokens <= resource.data.tokens;
+    }
+  }
+}
